@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+:root {
+  --page: #fbfbfd;
+  --card: #edeef2;
+  --ink: #14162b;
+  --muted: #5b5f73;
+  --blue: #2e4bff;
+  --blue-hover: #1e3ae0;
+  --blue-active: #152cb8;
+  --magenta: #ff2e93;
+  --magenta-hover: #e81a7e;
+}
+
+@theme inline {
+  --color-page: var(--page);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-muted: var(--muted);
+  --color-blue: var(--blue);
+  --color-blue-hover: var(--blue-hover);
+  --color-blue-active: var(--blue-active);
+  --color-magenta: var(--magenta);
+  --color-magenta-hover: var(--magenta-hover);
+
+  --font-display: var(--font-big-shoulders);
+  --font-accent: var(--font-instrument-serif);
+  --font-body: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  background: var(--page);
+  color: var(--ink);
+  font-family: var(--font-plex-sans), sans-serif;
+}
+
+::selection {
+  background: var(--blue);
+  color: white;
+}
+
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

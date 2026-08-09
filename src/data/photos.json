@@ -1,0 +1,277 @@
+{
+  "dsc00009": {
+    "title": "Fist Pump at the Arch",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Finish",
+    "width": 1600,
+    "height": 1067,
+    "thumbWidth": 900,
+    "thumbHeight": 600,
+    "bibs": [
+      "M16"
+    ],
+    "reviewed": true
+  },
+  "dsc00017": {
+    "title": "Helping a Rival Up",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Finish",
+    "width": 1600,
+    "height": 1066,
+    "thumbWidth": 900,
+    "thumbHeight": 600,
+    "bibs": [
+      "M16"
+    ],
+    "reviewed": true
+  },
+  "dsc00244": {
+    "title": "First Light on the Course",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Finish",
+    "width": 1600,
+    "height": 1067,
+    "thumbWidth": 900,
+    "thumbHeight": 600,
+    "bibs": [],
+    "reviewed": true
+  },
+  "dsc00298": {
+    "title": "Karl, Job Done",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Crowd",
+    "width": 1600,
+    "height": 1066,
+    "thumbWidth": 900,
+    "thumbHeight": 600,
+    "bibs": [
+      "M46"
+    ],
+    "reviewed": true
+  },
+  "dsc00330": {
+    "title": "The Black Hat, Mile 11",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Run",
+    "width": 1600,
+    "height": 1066,
+    "thumbWidth": 900,
+    "thumbHeight": 600,
+    "bibs": [
+      "51"
+    ],
+    "reviewed": true
+  },
+  "dsc00470": {
+    "title": "Watching the Swim Come In",
+    "event": "IRONMAN Tallinn",
+    "day": "Sat, Aug 24",
+    "discipline": "Crowd",
+    "width": 1100,
+    "height": 1650,
+    "thumbWidth": 700,
+    "thumbHeight": 1050,
+    "bibs": [],
+    "reviewed": true
+  },
+  "dsc00605": {
+    "title": "Thumbs Up on the Run",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Run",
+    "width": 1600,
+    "height": 1067,
+    "thumbWidth": 900,
+    "thumbHeight": 600,
+    "bibs": [
+      "2037",
+      "260"
+    ],
+    "reviewed": true
+  },
+  "dsc00680": {
+    "title": "Marina's Home Stretch",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Finish",
+    "width": 1600,
+    "height": 1067,
+    "thumbWidth": 900,
+    "thumbHeight": 600,
+    "bibs": [
+      "778"
+    ],
+    "reviewed": true
+  },
+  "dsc00687": {
+    "title": "Arms Wide at the Arch",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Finish",
+    "width": 1600,
+    "height": 1067,
+    "thumbWidth": 900,
+    "thumbHeight": 600,
+    "bibs": [
+      "599"
+    ],
+    "reviewed": true
+  },
+  "dsc00721": {
+    "title": "Fists Up on Two Wheels",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Crowd",
+    "width": 1600,
+    "height": 1067,
+    "thumbWidth": 900,
+    "thumbHeight": 600,
+    "bibs": [
+      "21CC"
+    ],
+    "reviewed": true
+  },
+  "dsc00757": {
+    "title": "Sprint for the Line",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Finish",
+    "width": 1600,
+    "height": 2400,
+    "thumbWidth": 900,
+    "thumbHeight": 1350,
+    "bibs": [
+      "525"
+    ],
+    "reviewed": true
+  },
+  "dsc01051": {
+    "title": "Time Trial Position",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Bike",
+    "width": 1600,
+    "height": 1066,
+    "thumbWidth": 900,
+    "thumbHeight": 600,
+    "bibs": [
+      "22"
+    ],
+    "reviewed": true
+  },
+  "dsc01161": {
+    "title": "Climbing in Maroon",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Bike",
+    "width": 1600,
+    "height": 1202,
+    "thumbWidth": 900,
+    "thumbHeight": 676,
+    "bibs": [
+      "572"
+    ],
+    "reviewed": true
+  },
+  "dsc01205": {
+    "title": "Past the Arena",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Run",
+    "width": 1600,
+    "height": 1067,
+    "thumbWidth": 900,
+    "thumbHeight": 600,
+    "bibs": [
+      "857"
+    ],
+    "reviewed": true
+  },
+  "dsc01212": {
+    "title": "Transition Row",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Transition",
+    "width": 1600,
+    "height": 1067,
+    "thumbWidth": 900,
+    "thumbHeight": 600,
+    "bibs": [
+      "207",
+      "209",
+      "211"
+    ],
+    "reviewed": true
+  },
+  "dsc01236": {
+    "title": "Under the Overpass",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Bike",
+    "width": 1600,
+    "height": 1036,
+    "thumbWidth": 900,
+    "thumbHeight": 583,
+    "bibs": [
+      "594"
+    ],
+    "reviewed": true
+  },
+  "dsc01351": {
+    "title": "Luigi Finishes Strong",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Run",
+    "width": 1600,
+    "height": 1067,
+    "thumbWidth": 900,
+    "thumbHeight": 600,
+    "bibs": [
+      "664"
+    ],
+    "reviewed": true
+  },
+  "dsc09743": {
+    "title": "Owen in the Aero Bars",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Run",
+    "width": 1600,
+    "height": 1067,
+    "thumbWidth": 900,
+    "thumbHeight": 600,
+    "bibs": [
+      "2114"
+    ],
+    "reviewed": true
+  },
+  "dsc09775": {
+    "title": "Out of Transition",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Bike",
+    "width": 1600,
+    "height": 1066,
+    "thumbWidth": 900,
+    "thumbHeight": 600,
+    "bibs": [],
+    "reviewed": true
+  },
+  "dsc09994": {
+    "title": "Cool Down on the Carpet",
+    "event": "IRONMAN 70.3 Tallinn European Championship",
+    "day": "Sun, Aug 25",
+    "discipline": "Finish",
+    "width": 1600,
+    "height": 1067,
+    "thumbWidth": 900,
+    "thumbHeight": 600,
+    "bibs": [],
+    "reviewed": true
+  }
+}

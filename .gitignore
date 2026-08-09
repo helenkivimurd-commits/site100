@@ -1,0 +1,19 @@
+node_modules/
+.next/
+out/
+build/
+
+# Secrets — API keys live here. Never commit this file.
+.env
+.env.local
+.env*.local
+
+# Order records and download tokens (generated at runtime)
+.data/
+
+*.tsbuildinfo
+next-env.d.ts
+
+.DS_Store
+*.pem
+npm-debug.log*
