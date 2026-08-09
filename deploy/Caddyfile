@@ -1,0 +1,28 @@
+# Replace kivimurd.ee with your real domain, then:
+#   sudo cp Caddyfile /etc/caddy/Caddyfile && sudo systemctl reload caddy
+#
+# Caddy obtains and renews the HTTPS certificate automatically. Nothing to do
+# beyond pointing the domain's A record at this server first.
+
+kivimurd.ee, www.kivimurd.ee {
+	encode zstd gzip
+
+	# Sets X-Forwarded-For and X-Forwarded-Proto, which the app's rate limiter
+	# reads. Safe only because Node binds to 127.0.0.1 and cannot be reached
+	# around this proxy — see deploy/hkp.service.
+	reverse_proxy 127.0.0.1:3000
+
+	# Admin login travels as Basic auth, which is reversible base64. HSTS stops
+	# a browser being downgraded to http where it could be read off the wire.
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "strict-origin-when-cross-origin"
+	}
+
+	# Purchased files are large; give slow phone connections room.
+	timeouts {
+		read_body 10m
+	}
+}

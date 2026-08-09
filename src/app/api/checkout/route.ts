@@ -4,11 +4,26 @@ import { getPhoto } from "@/lib/catalog";
 import type { Photo } from "@/lib/types";
 import { pricePerPhotoAt } from "@/lib/pricing";
 import { createPendingOrder } from "@/lib/orders";
+import { clientKey, rateLimit } from "@/lib/rateLimit";
 
 // Stripe caps a Checkout Session at 100 line items.
 const MAX_PHOTOS = 100;
 
+// Each call creates a Stripe session and writes an order record, so this is the
+// one public endpoint where repeated hits cost real resources. Generous enough
+// that a customer changing their mind several times never notices.
+const MAX_CHECKOUTS = 15;
+const CHECKOUT_WINDOW_MS = 5 * 60 * 1000;
+
 export async function POST(request: Request) {
+  const limit = rateLimit(clientKey(request, "checkout"), MAX_CHECKOUTS, CHECKOUT_WINDOW_MS);
+  if (!limit.ok) {
+    return NextResponse.json(
+      { error: "Too many checkout attempts. Please wait a moment and try again." },
+      { status: 429, headers: { "Retry-After": String(limit.retryAfter) } }
+    );
+  }
+
   const body = (await request.json().catch(() => null)) as {
     photoIds?: unknown;
     email?: unknown;

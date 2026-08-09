@@ -1,0 +1,34 @@
+[Unit]
+Description=h_kivimurd Photography
+After=network.target
+
+[Service]
+Type=simple
+User=hkp
+WorkingDirectory=/srv/hkp/site
+
+Environment=NODE_ENV=production
+Environment=PORT=3000
+
+# -H 127.0.0.1 binds to loopback only, so the app is reachable *only* through
+# Caddy. This is load-bearing: rate limiting and the client IP in the logs both
+# trust the X-Forwarded-For header Caddy sets, and that header is forgeable by
+# anyone who can reach Node directly. Do not change this to 0.0.0.0.
+ExecStart=/usr/bin/node node_modules/.bin/next start -H 127.0.0.1
+
+Restart=always
+RestartSec=5
+
+# One process, deliberately. photos.json and orders.json are guarded by
+# in-memory write queues, and the rate limiter counts in memory too — a second
+# process would corrupt the first and multiply the second. See ARCHITECTURE.md.
+
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+# The app writes uploads, order records and processed images under here.
+ReadWritePaths=/srv/hkp/site /srv/hkp/Media
+
+[Install]
+WantedBy=multi-user.target
