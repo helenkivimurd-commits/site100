@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useState, type FormEvent } from "react";
 import { useCart } from "@/components/CartProvider";
 import { formatMoney } from "@/lib/money";
+import { purchaseLabel } from "@/lib/photoTitle";
 import { bundleLabel, bundleSubLabel } from "@/lib/pricing";
 
 export default function CheckoutPage() {
@@ -129,7 +130,7 @@ export default function CheckoutPage() {
                 </div>
                 <div className="flex flex-1 items-center justify-between gap-2">
                   <span className="text-sm leading-snug">
-                    {photo.bibs.length > 0 ? `Bib ${photo.bibs.join(" / ")}` : photo.id.toUpperCase()}
+                    {purchaseLabel(photo)}
                   </span>
                   <span className="shrink-0 font-mono text-sm text-blue">
                     {formatMoney(photo.price)}

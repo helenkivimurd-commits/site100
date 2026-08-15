@@ -47,6 +47,9 @@ export async function GET(request: Request) {
         const photo = getPhoto(id);
         return {
           id,
+          // Included so the success and downloads pages can name a photo the
+          // way the rest of the site does, instead of falling back to its id.
+          title: photo?.title ?? "",
           bibs: photo?.bibs ?? [],
           day: photo?.day ?? "",
           url: downloadUrl(baseUrl, order.token, id),

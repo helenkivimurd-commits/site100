@@ -4,6 +4,7 @@ import Image from "next/image";
 import { useEffect } from "react";
 import { useCart, toCartItem } from "./CartProvider";
 import { formatMoney } from "@/lib/money";
+import { photoLabel } from "@/lib/photoTitle";
 import type { Photo } from "@/lib/types";
 
 export default function PhotoLightbox({
@@ -54,16 +55,18 @@ export default function PhotoLightbox({
         </button>
 
         <div className="relative flex flex-1 items-center justify-center bg-ink">
-          <div className="relative aspect-[3/2] w-full md:aspect-auto md:h-[88vh] md:w-full">
-            <Image
-              src={`/photos/preview/${photo.id}.jpg`}
-              alt={photo.bibs.length > 0 ? `Bib ${photo.bibs.join(", ")}` : photo.day}
-              fill
-              sizes="(min-width: 768px) 65vw, 100vw"
-              className="object-contain"
-              priority
-            />
-          </div>
+          {/* Sized from the photo's own dimensions rather than a fixed height:
+              a fixed container forces every landscape shot into thick black
+              bars. Width-led sizing means the common case has none at all. */}
+          <Image
+            src={`/photos/preview/${photo.id}.jpg`}
+            alt={photoLabel(photo)}
+            width={photo.width}
+            height={photo.height}
+            sizes="(min-width: 768px) 65vw, 100vw"
+            className="h-auto max-h-[86vh] w-full object-contain"
+            priority
+          />
           {onPrev && (
             <button
               onClick={onPrev}
@@ -84,10 +87,12 @@ export default function PhotoLightbox({
           )}
         </div>
 
-        <div className="flex w-full flex-col justify-between gap-6 p-6 md:w-80 md:shrink-0 md:overflow-y-auto">
+        {/* Natural flow, not justify-between: pushing the price to the bottom
+            of a tall panel left a large empty gap that read as unfinished. */}
+        <div className="flex w-full flex-col gap-6 p-6 md:w-80 md:shrink-0 md:overflow-y-auto">
           <div>
             <h3 className="font-display text-2xl uppercase leading-tight tracking-wide">
-              {photo.id.toUpperCase()}
+              {photoLabel(photo)}
             </h3>
             <dl className="mt-4 space-y-2 font-mono text-xs text-muted">
               <div className="flex justify-between border-b border-card pb-2">

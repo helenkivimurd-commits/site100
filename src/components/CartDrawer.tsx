@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { useCart } from "./CartProvider";
 import { formatMoney } from "@/lib/money";
+import { purchaseLabel } from "@/lib/photoTitle";
 import { bundleLabel, bundleSubLabel, BUNDLE_5_THRESHOLD, BUNDLE_10_THRESHOLD } from "@/lib/pricing";
 
 export default function CartDrawer() {
@@ -80,7 +81,7 @@ export default function CartDrawer() {
                   <div className="flex flex-1 flex-col justify-between">
                     <div>
                       <p className="text-sm font-medium leading-snug">
-                        {photo.bibs.length > 0 ? `Bib ${photo.bibs.join(" / ")}` : photo.id.toUpperCase()}
+                        {purchaseLabel(photo)}
                       </p>
                       <p className="font-mono text-xs text-muted">{photo.day}</p>
                     </div>

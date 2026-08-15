@@ -4,9 +4,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { formatMoney } from "@/lib/money";
+import { purchaseLabel } from "@/lib/photoTitle";
 import { loadPurchases, forgetPurchase } from "@/lib/purchases";
 
-type OrderPhoto = { id: string; bibs: string[]; day: string; url: string };
+type OrderPhoto = { id: string; title: string; bibs: string[]; day: string; url: string };
 type LoadedOrder = {
   sessionId: string;
   amountTotal: number;
@@ -115,11 +116,7 @@ export default function DownloadsPage() {
                   />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">
-                    {photo.bibs.length > 0
-                      ? `Bib ${photo.bibs.join(" / ")}`
-                      : photo.id.toUpperCase()}
-                  </p>
+                  <p className="text-sm font-medium">{purchaseLabel(photo)}</p>
                   <p className="font-mono text-xs text-muted">{photo.day}</p>
                 </div>
                 <a

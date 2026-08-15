@@ -58,7 +58,10 @@ export default function Home() {
       {/* "Find my bib" targets the top of the hero, not the bib card lower down.
           scroll-mt clears the sticky header so the hero isn't tucked under it. */}
       <section id="find" className="relative scroll-mt-[73px] overflow-hidden bg-ink sm:scroll-mt-[81px]">
-        <div className="relative h-[480px] sm:h-[520px] lg:h-[600px]">
+        {/* Kept under ~560px so the bib card's "Find my photos" button clears
+            the fold on a typical laptop — searching a bib is the whole point of
+            this page, and it was landing just below the viewport at 600px. */}
+        <div className="relative h-[440px] sm:h-[480px] lg:h-[540px]">
           <Image
             src="/photos/hero/dsc00009.jpg"
             alt="A finisher pumps his fist under the Ironman Tallinn finish arch"
@@ -70,9 +73,12 @@ export default function Home() {
           />
           <div className="absolute inset-0 bg-gradient-to-t from-ink via-ink/25 to-transparent" />
           <div className="absolute inset-0 bg-gradient-to-r from-ink/55 via-transparent to-transparent" />
+          {/* The existing gradients all darken from the bottom, leaving the
+              event name sitting on the brightest part of the frame. */}
+          <div className="absolute inset-x-0 top-0 h-2/5 bg-gradient-to-b from-ink/65 to-transparent" />
 
           <div className="absolute inset-0 flex flex-col justify-center px-5 pb-14 sm:px-8 lg:px-16">
-            <p className="font-mono text-xs uppercase tracking-[0.3em] text-white/70">
+            <p className="font-mono text-xs uppercase tracking-[0.18em] text-white/90 sm:tracking-[0.3em]">
               Ironman Tallinn · European Championship
             </p>
             <h1 className="mt-4 max-w-2xl font-display text-4xl uppercase leading-[0.95] tracking-wide text-white sm:text-5xl lg:text-7xl">
@@ -80,7 +86,7 @@ export default function Home() {
               <br />
               We caught it.
             </h1>
-            <p className="mt-5 max-w-md font-accent text-xl italic text-white/85 sm:text-2xl lg:text-3xl">
+            <p className="mt-5 max-w-xl font-accent text-xl italic text-white/85 sm:text-2xl lg:text-3xl">
               Somewhere in a thousand frames, that&apos;s you.
             </p>
           </div>

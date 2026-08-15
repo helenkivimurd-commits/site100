@@ -5,9 +5,10 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 import { useCart } from "@/components/CartProvider";
 import { formatMoney } from "@/lib/money";
+import { purchaseLabel } from "@/lib/photoTitle";
 import { savePurchase } from "@/lib/purchases";
 
-type OrderPhoto = { id: string; bibs: string[]; day: string; url: string };
+type OrderPhoto = { id: string; title: string; bibs: string[]; day: string; url: string };
 type OrderResponse =
   | { status: "paid"; amountTotal: number; expiresAt: string; photos: OrderPhoto[] }
   | { status: "pending" };
@@ -27,10 +28,9 @@ export default function SuccessClient({ sessionId }: { sessionId: string }) {
   const cleared = useRef(false);
 
   useEffect(() => {
-    if (!sessionId) {
-      setError("No order reference in the link.");
-      return;
-    }
+    // A missing session id is knowable during render, so it's handled below
+    // rather than by setting state from here.
+    if (!sessionId) return;
 
     let cancelled = false;
     let attempts = 0;
@@ -70,10 +70,12 @@ export default function SuccessClient({ sessionId }: { sessionId: string }) {
     };
   }, [sessionId, clear]);
 
-  if (error) {
+  const problem = sessionId ? error : "No order reference in the link.";
+
+  if (problem) {
     return (
       <Shell title="We couldn't find that order">
-        <p className="text-sm text-muted">{error}</p>
+        <p className="text-sm text-muted">{problem}</p>
         <p className="text-sm text-muted">
           If you were charged, your download links are also in your confirmation email.
           Otherwise get in touch at{" "}
@@ -129,7 +131,7 @@ export default function SuccessClient({ sessionId }: { sessionId: string }) {
             <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded bg-card">
               <Image
                 src={`/photos/thumb/${photo.id}.jpg`}
-                alt={photo.bibs.length > 0 ? `Bib ${photo.bibs.join(", ")}` : photo.id}
+                alt={purchaseLabel(photo)}
                 fill
                 sizes="96px"
                 className="object-cover"
@@ -137,7 +139,7 @@ export default function SuccessClient({ sessionId }: { sessionId: string }) {
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium">
-                {photo.bibs.length > 0 ? `Bib ${photo.bibs.join(" / ")}` : photo.id.toUpperCase()}
+                {purchaseLabel(photo)}
               </p>
               <p className="font-mono text-xs text-muted">{photo.day}</p>
             </div>

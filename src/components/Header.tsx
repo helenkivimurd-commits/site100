@@ -16,6 +16,10 @@ export default function Header() {
   // exist during SSR, and rendering it server-side would cause a mismatch.
   const [hasPurchases, setHasPurchases] = useState(false);
   useEffect(() => {
+    // Same one-shot hydration pattern as CartProvider: localStorage doesn't
+    // exist during SSR, so this can't be a lazy useState initializer without
+    // causing a hydration mismatch.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setHasPurchases(loadPurchases().length > 0);
   }, []);
 
@@ -29,7 +33,7 @@ export default function Header() {
               alt="h_kivimurd Photography"
               width={225}
               height={115}
-              className="h-14 w-auto sm:h-16"
+              className="h-11 w-auto sm:h-16"
               priority
             />
           </Link>

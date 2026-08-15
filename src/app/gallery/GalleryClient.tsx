@@ -79,12 +79,12 @@ export default function GalleryClient({
           </div>
         </div>
         {days.length > 2 && (
-          <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-5 pb-3 sm:px-8">
+          <div className="mx-auto flex max-w-7xl flex-wrap gap-2 px-5 pb-3 sm:px-8">
             {days.map((d) => (
               <button
                 key={d}
                 onClick={() => setDay(d)}
-                className={`shrink-0 rounded-full px-3.5 py-1.5 font-mono text-xs uppercase tracking-wide transition-colors ${
+                className={`rounded-full px-3.5 py-1.5 font-mono text-xs uppercase tracking-wide transition-colors ${
                   day === d ? "bg-blue text-white" : "bg-card text-muted hover:text-ink"
                 }`}
               >
@@ -93,12 +93,15 @@ export default function GalleryClient({
             ))}
           </div>
         )}
-        <div className="mx-auto flex max-w-7xl gap-2 overflow-x-auto px-5 pb-4 sm:px-8">
+        {/* Wraps rather than scrolling sideways: on a phone the row used to be
+            clipped mid-chip, so Swim and Transition were invisible with nothing
+            to suggest more existed. One extra row is worth them being findable. */}
+        <div className="mx-auto flex max-w-7xl flex-wrap gap-2 px-5 pb-4 sm:px-8">
           {disciplines.map((d) => (
             <button
               key={d}
               onClick={() => setDiscipline(d)}
-              className={`shrink-0 rounded-full border px-3.5 py-1.5 font-mono text-xs uppercase tracking-wide transition-colors ${
+              className={`rounded-full border px-3.5 py-1.5 font-mono text-xs uppercase tracking-wide transition-colors ${
                 discipline === d
                   ? "border-ink bg-ink text-white"
                   : "border-ink/15 text-muted hover:border-ink hover:text-ink"

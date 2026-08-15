@@ -67,6 +67,8 @@ export default function BibSearch({
       >
         Your bib number
       </label>
+      {/* Placeholder kept very faint: at this size a darker one reads as a
+          number already filled in rather than an example. */}
       <input
         id="bib-input"
         value={value}
@@ -74,7 +76,7 @@ export default function BibSearch({
         inputMode="numeric"
         placeholder="2037"
         aria-label="Your bib number"
-        className="mt-2 w-full border-b-2 border-dashed border-ink/20 bg-transparent pb-2 text-center font-mono text-5xl font-medium tracking-wide text-ink outline-none placeholder:text-ink/20 sm:text-6xl"
+        className="mt-2 w-full border-b-2 border-dashed border-ink/20 bg-transparent pb-2 text-center font-mono text-5xl font-medium tracking-wide text-ink outline-none placeholder:text-ink/15 sm:text-6xl"
       />
       <button
         type="submit"
