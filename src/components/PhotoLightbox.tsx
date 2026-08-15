@@ -91,10 +91,7 @@ export default function PhotoLightbox({
             of a tall panel left a large empty gap that read as unfinished. */}
         <div className="flex w-full flex-col gap-6 p-6 md:w-80 md:shrink-0 md:overflow-y-auto">
           <div>
-            <h3 className="font-display text-2xl uppercase leading-tight tracking-wide">
-              {photoLabel(photo)}
-            </h3>
-            <dl className="mt-4 space-y-2 font-mono text-xs text-muted">
+            <dl className="space-y-2 font-mono text-xs text-muted">
               <div className="flex justify-between border-b border-card pb-2">
                 <dt>Bib</dt>
                 <dd className="text-ink">{photo.bibs.length ? photo.bibs.join(", ") : "—"}</dd>

@@ -43,7 +43,7 @@ const steps = [
   {
     n: "02",
     title: "Preview every shot",
-    body: "See every frame we caught of you — swim exit, bike leg, run, and the finish arch — in full size before you buy.",
+    body: "See every frame we caught of you — swim exit, bike leg, run — in full size before you buy.",
   },
   {
     n: "03",
@@ -82,12 +82,12 @@ export default function Home() {
               Ironman Tallinn · European Championship
             </p>
             <h1 className="mt-4 max-w-2xl font-display text-4xl uppercase leading-[0.95] tracking-wide text-white sm:text-5xl lg:text-7xl">
-              You finished.
+              You&apos;ll forget the pain.
               <br />
-              We caught it.
+              Not this.
             </h1>
             <p className="mt-5 max-w-xl font-accent text-xl italic text-white/85 sm:text-2xl lg:text-3xl">
-              Somewhere in a thousand frames, that&apos;s you.
+              Find your bib. See it again.
             </p>
           </div>
         </div>
@@ -102,10 +102,11 @@ export default function Home() {
       <section className="border-y border-card">
         <div className="mx-auto grid max-w-5xl grid-cols-1 divide-y divide-card font-mono text-sm text-muted sm:grid-cols-3 sm:divide-x sm:divide-y-0">
           <div className="flex items-center justify-center gap-2 px-4 py-5">
-            <span className="text-ink">1,000+</span> photos catalogued
+            <span className="text-ink">{photos.length.toLocaleString("en-US")}</span> photos
+            catalogued
           </div>
           <div className="flex items-center justify-center gap-2 px-4 py-5">
-            <span className="text-ink">5,000</span> finishers on course
+            <span className="text-ink">4,000+</span> racers on course
           </div>
           <div className="flex items-center justify-center gap-2 px-4 py-5">
             <span className="text-ink">3</span> disciplines covered

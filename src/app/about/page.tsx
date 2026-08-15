@@ -8,46 +8,41 @@ export const metadata = {
 export default function AboutPage() {
   return (
     <div className="mx-auto max-w-4xl px-5 py-16 sm:px-8 sm:py-24">
-      <div className="flex flex-col gap-10 sm:flex-row sm:items-start">
-        <div className="relative aspect-[900/1371] w-full shrink-0 overflow-hidden rounded-md bg-card sm:w-64">
-          <Image
-            src="/images/photographer.jpg"
-            alt="h_kivimurd, the photographer behind the camera"
-            fill
-            sizes="(min-width: 640px) 256px, 100vw"
-            className="object-cover"
-            priority
-          />
-        </div>
-
-        <div>
-          <p className="font-mono text-xs uppercase tracking-[0.25em] text-muted">About</p>
-          <h1 className="mt-3 font-display text-4xl uppercase tracking-wide sm:text-5xl">
-            One photographer, the whole race course.
-          </h1>
-          <p className="mt-6 font-accent text-2xl italic text-muted sm:text-3xl">
-            I shoot the moments you were too busy racing to see.
-          </p>
-        </div>
+      <div>
+        <p className="font-mono text-xs uppercase tracking-[0.25em] text-muted">About</p>
+        <h1 className="mt-3 font-display text-4xl uppercase tracking-wide sm:text-5xl">
+          I shoot the moments you were too busy racing to see.
+        </h1>
       </div>
 
       <div className="prose-none mt-10 flex flex-col gap-5 text-[15px] leading-relaxed text-ink/90 sm:text-base">
         <p>
-          h_kivimurd Photography covers endurance racing in Estonia — swim starts, transition
-          chaos, the long grind of the bike leg, and the finish arch where it all pays off.
-          Ironman Tallinn is home turf: I know where the light is good at 7am on the
-          Pirita waterfront, and where the crowd gets loudest on the red carpet.
+          I&apos;m Helen! I&apos;m a self-taught 17-year-old photographer who fell in love with
+          the raw emotion of endurance racing. There&apos;s nothing else like the moment someone
+          crosses a finish line after everything they gave to get there.
         </p>
         <p>
-          Every race is shot in full — thousands of frames across the day — then sorted by bib
-          number so you can find every photo of yourself in one search. No packages, no
-          waiting for a gallery email: browse, preview at full size, and buy the shots that
-          actually get you.
+          I&apos;m out on the course for one reason: you. The months of training, the pain, the
+          doubt, the finish — you earned every second of it, and you deserve a photo that does
+          it justice. Not a snapshot. Proof of what you&apos;re capable of and that you can do
+          it with a smile on your face.
         </p>
         <p>
-          Photos go up in batches during and after the event. If your number doesn&apos;t turn
-          up straight away, it&apos;s still being sorted — check back in a few hours.
+          Every print helps fund a bigger dream of mine — studying abroad. When you buy a
+          photo, you&apos;re not just getting your moment frozen forever; you&apos;re helping me
+          chase my dream.
         </p>
+        <p>Thank you for letting me be part of your day!</p>
+      </div>
+
+      <div className="relative mx-auto mt-14 aspect-[900/1371] w-full max-w-sm overflow-hidden rounded-md bg-card">
+        <Image
+          src="/images/photographer.jpg"
+          alt="h_kivimurd, the photographer behind the camera"
+          fill
+          sizes="(min-width: 640px) 384px, 100vw"
+          className="object-cover"
+        />
       </div>
 
       <div className="mt-14 flex flex-col items-start gap-4 rounded-md bg-card p-6 sm:flex-row sm:items-center sm:justify-between">

@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { useCart, toCartItem } from "./CartProvider";
 import { formatMoney } from "@/lib/money";
-import { photoLabel, realTitle } from "@/lib/photoTitle";
+import { photoLabel } from "@/lib/photoTitle";
 import type { Photo } from "@/lib/types";
 
 export default function PhotoCard({
@@ -46,12 +46,7 @@ export default function PhotoCard({
         )}
       </button>
 
-      <div className="mt-2 flex items-center justify-between gap-2">
-        {/* The photographer's title when there is one — it sells the photo far
-            better than a date does. Falls back to the day for untitled uploads. */}
-        <p className="min-w-0 truncate text-xs text-muted" title={photoLabel(photo)}>
-          {realTitle(photo) ?? photo.day}
-        </p>
+      <div className="mt-2 flex items-center justify-end">
         <button
           type="button"
           onClick={() => (inCart ? remove(photo.id) : add(toCartItem(photo)))}
