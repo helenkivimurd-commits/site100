@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import sharp from "sharp";
-import { findOriginal } from "@/lib/originals";
+import { findOriginal, readOriginal } from "@/lib/originals";
 import { guardAdminRoute } from "@/lib/adminAuth";
 
 // Widest edge for the admin viewer. Big enough to read a bib number pinned to
@@ -17,15 +17,18 @@ export async function GET(request: Request) {
   const id = new URL(request.url).searchParams.get("id");
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
 
-  const original = await findOriginal(id);
-  if (!original) {
+  const key = await findOriginal(id);
+  if (!key) {
     return NextResponse.json(
-      { error: "No original found for this photo. It may have been moved out of Media/." },
+      { error: "No original found for this photo. It may have been removed from the bucket." },
       { status: 404 }
     );
   }
 
-  const body = await sharp(original)
+  // Unlike the paid download, this one can't be a redirect: the point is to
+  // hand the admin a *downscaled* frame, so the bytes have to come back here
+  // for sharp to resize before anything leaves the server.
+  const body = await sharp(await readOriginal(key))
     .rotate()
     .resize({ width: VIEW_WIDTH, withoutEnlargement: true })
     .jpeg({ quality: 88, mozjpeg: true })

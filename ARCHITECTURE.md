@@ -42,7 +42,8 @@ Stripe's hosted page     customer enters card details on stripe.com
 /checkout/success        download buttons, one per photo
    │                     src/app/checkout/success/SuccessClient.tsx
    ▼
-GET /api/download        checks token, streams the original file
+GET /api/download        checks token, then redirects to a short-lived
+                         signed link straight to the bucket
                          src/app/api/download/route.ts
 ```
 
@@ -52,7 +53,7 @@ is remembered in their browser.
 ### 2. The photographer publishes photos
 
 ```
-Puts JPGs in ../Media/           (a folder next to the project)
+Starts with a folder of JPGs
    │
    ├── Bulk route: node scripts/process-photos.mjs
    │       resizes + watermarks everything in one go
@@ -60,7 +61,7 @@ Puts JPGs in ../Media/           (a folder next to the project)
    └── Normal route: /admin  →  drag photos onto the page
            POST /api/photos
            resizes, watermarks, writes preview + thumb,
-           keeps the original in ../Media/uploads/
+           uploads the original to the B2 bucket
    ▼
 Tags each photo in /admin        clicks a thumbnail, reads the bib number
    │                             off the full-size original, types it in
@@ -79,8 +80,10 @@ The whole admin area sits behind a password (`src/proxy.ts`).
 |---|---|
 | Who decides the price? | The **server**, in `src/app/api/checkout/route.ts`, reading `src/lib/pricing.ts` |
 | Who confirms payment? | Stripe, via the webhook — never the browser |
-| Where are unwatermarked originals? | `../Media/`, outside the web root. Never served as static files |
+| Where are unwatermarked originals? | A **private** Backblaze B2 bucket, under `originals/`. Never on this server, never served as static files |
 | Who can download them? | Someone with a token from a paid order, or the logged-in admin |
+| How does the file actually reach them? | `/api/download` checks access, then redirects to a signed bucket link that expires after 15 minutes. The bytes never pass through this server |
+| What happens to the original when a photo is deleted in `/admin`? | **Nothing — it stays in the bucket, on purpose.** Deleting only removes the catalogue entry, preview and thumbnail. The original is the irreplaceable thing, so it is never removed by an admin click; clear them by hand in the B2 dashboard if you ever need the space |
 
 ---
 
@@ -166,7 +169,7 @@ The whole admin area sits behind a password (`src/proxy.ts`).
 | `src/lib/pricing.ts` | **All prices live here.** €5 each, 20% off at 5+, 40% off at 10+ |
 | `src/lib/money.ts` | Formats numbers as euros |
 | `src/lib/serverImage.ts` | Resizes and watermarks an uploaded photo; turns filenames into ids |
-| `src/lib/originals.ts` | Finds the original file in `../Media/` for a given photo id |
+| `src/lib/originals.ts` | The only file that knows where originals live. Finds, uploads, reads, and signs download links for objects in the B2 bucket |
 | `src/lib/orders.ts` | Order records and download tokens. Reads/writes `.data/orders.json` |
 | `src/lib/stripe.ts` | Creates the Stripe client from `STRIPE_SECRET_KEY` |
 | `src/lib/email.ts` | The confirmation email, sent through Resend |
@@ -183,7 +186,7 @@ The whole admin area sits behind a password (`src/proxy.ts`).
 | `public/photos/preview/` | 1600px watermarked — the lightbox |
 | `public/photos/hero/` | 2560px **unwatermarked** — homepage banner only |
 | `public/images/` | Logo (ink and white) and the photographer portrait |
-| `../Media/` | **Outside the project.** The untouched originals. Currently placeholders |
+| B2 bucket, `originals/` | **Off this server entirely.** The untouched originals, keyed `<photo-id>.<ext>`. Reachable only through `src/lib/originals.ts` |
 
 ### Scripts — run by hand, not part of the site
 

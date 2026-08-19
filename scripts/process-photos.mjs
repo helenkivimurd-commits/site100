@@ -3,7 +3,16 @@ import path from "node:path";
 import fs from "node:fs/promises";
 
 const ROOT = path.resolve(import.meta.dirname, "..");
-const SRC_DIR = path.resolve(ROOT, "..", "Media");
+
+// Reads a LOCAL folder of untouched originals and writes the watermarked
+// derivatives into public/. Nothing here talks to the B2 bucket — the originals
+// themselves get there separately (see DEPLOYMENT.md step 8), so this only
+// needs the source files present while it runs, wherever you keep them:
+//
+//   PHOTOS_SRC_DIR=~/Pictures/ironman-2026 node scripts/process-photos.mjs
+const SRC_DIR = process.env.PHOTOS_SRC_DIR
+  ? path.resolve(process.env.PHOTOS_SRC_DIR)
+  : path.resolve(ROOT, "..", "Media");
 const PREVIEW_DIR = path.join(ROOT, "public", "photos", "preview");
 const THUMB_DIR = path.join(ROOT, "public", "photos", "thumb");
 const HERO_DIR = path.join(ROOT, "public", "photos", "hero");

@@ -3,7 +3,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { StoredPhoto } from "@/lib/types";
 import { processUploadedPhoto, slugifyFilename } from "@/lib/serverImage";
-import { UPLOADS_DIR } from "@/lib/originals";
+import { putOriginal } from "@/lib/originals";
 import { guardAdminRoute } from "@/lib/adminAuth";
 
 const DATA_FILE = path.join(process.cwd(), "src", "data", "photos.json");
@@ -108,7 +108,6 @@ export async function POST(request: Request) {
   const created = await withQueue(async () => {
     await fs.mkdir(PREVIEW_DIR, { recursive: true });
     await fs.mkdir(THUMB_DIR, { recursive: true });
-    await fs.mkdir(UPLOADS_DIR, { recursive: true });
 
     const data = await readData();
     const existingIds = new Set(Object.keys(data));
@@ -123,14 +122,14 @@ export async function POST(request: Request) {
       const processed = await processUploadedPhoto(source);
       await fs.writeFile(path.join(PREVIEW_DIR, `${id}.jpg`), processed.preview.buffer);
       await fs.writeFile(path.join(THUMB_DIR, `${id}.jpg`), processed.thumb.buffer);
-      // Keep the original for future reprocessing (e.g. a bigger watermark, a new hero crop).
+      // Keep the original for future reprocessing (e.g. a bigger watermark, a new hero crop)
+      // and for the paid download. It goes to object storage, never to this
+      // server's disk and never under public/.
       //
-      // Named from `id`, never from file.name: the browser controls that string,
-      // and a filename like "../../.env.local" would otherwise let an upload
-      // escape UPLOADS_DIR and overwrite files elsewhere on the server. `id` is
-      // already reduced to [a-z0-9-], and naming the original after it also
-      // guarantees findOriginal() can match it back to this photo.
-      await fs.writeFile(path.join(UPLOADS_DIR, `${id}${extensionOf(file.name)}`), source);
+      // Keyed on `id`, never on file.name: the browser controls that string, and
+      // `id` is already reduced to [a-z0-9-]. Naming the object after it is also
+      // what guarantees findOriginal() can match it back to this photo.
+      await putOriginal(id, extensionOf(file.name), source);
 
       const entry: StoredPhoto = {
         title: file.name.replace(/\.[^./]+$/, ""),

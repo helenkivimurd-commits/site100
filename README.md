@@ -28,19 +28,18 @@ cp .env.local.example .env.local
 At minimum you need `ADMIN_PASSWORD` and `STRIPE_SECRET_KEY`. See
 [PAYMENTS.md](PAYMENTS.md) for getting Stripe keys and testing a purchase.
 
-**2. The original photos.** Originals live in a `Media/` folder **next to** the
-project directory, not inside it — that is what keeps them from ever being
-served as static files:
+**2. The original photos.** Originals live in a Backblaze B2 bucket, not on the
+server — that is what keeps them from ever being served as static files, and
+what stops a few thousand 12 MB JPEGs filling a small VPS disk. The five `B2_*`
+variables in `.env.local` point at it; see [ARCHITECTURE.md](ARCHITECTURE.md)
+for how a paid download reaches the customer.
 
-```
-parent/
-├── site/     ← this repository
-└── Media/    ← original JPEGs, plus Media/uploads/ for admin uploads
-```
+The bucket must be **private**. Uploading through `/admin` puts each original in
+it automatically, under `originals/<photo-id>.<ext>`.
 
-Without `../Media` the site still builds and the gallery still works (previews
-and thumbnails are committed under `public/photos/`), but the admin original
-viewer and paid downloads return 404.
+Without those variables the site still builds and the gallery still works
+(previews and thumbnails are committed under `public/photos/`), but the admin
+original viewer and paid downloads fail.
 
 Then:
 

@@ -84,6 +84,11 @@ Fill in:
 | Variable | Value |
 |---|---|
 | `ADMIN_PASSWORD` | A **new** one. Generate with `openssl rand -base64 24` |
+| `B2_BUCKET` | Your bucket name |
+| `B2_ENDPOINT` | `https://s3.<region>.backblazeb2.com`, from the bucket details |
+| `B2_REGION` | The region in that endpoint, e.g. `eu-central-003` |
+| `B2_KEY_ID` | B2 → Application Keys. Restrict the key to this one bucket |
+| `B2_APP_KEY` | The secret half. **Shown once, at creation** |
 | `STRIPE_SECRET_KEY` | Your `sk_live_…` key |
 | `STRIPE_WEBHOOK_SECRET` | From step 7 |
 | `NEXT_PUBLIC_BASE_URL` | `https://kivimurd.ee` — https, no trailing slash |
@@ -120,19 +125,34 @@ Copy the signing secret into `.env.local`, then `systemctl restart hkp`.
 
 ## 8. Upload the photos
 
+Originals go to the B2 bucket, **not** to the server — that is what keeps a
+40 GB VPS disk from filling up after one race.
+
+For an existing archive, upload straight from your Mac with `rclone`. Objects
+must be keyed `originals/<photo-id>.<ext>`, where the photo id is the filename
+lowercased with the extension stripped — that is what `findOriginal()` matches
+on.
+
 ```bash
-# from your Mac
-rsync -avz --progress /Users/kristjan/Downloads/Media/ \
-  root@YOUR_SERVER_IP:/srv/hkp/Media/
-ssh root@YOUR_SERVER_IP chown -R hkp:hkp /srv/hkp/Media
+# one-time: configure a remote called "b2" with your key id and app key
+rclone config
+
+# then, from the folder holding the originals
+rclone copy . b2:YOUR_BUCKET/originals/ --progress --transfers 8
 ```
 
-`Media/` sits **beside** the `site` folder, not inside it. Then use
-`https://kivimurd.ee/admin` to upload and tag.
+Verify the count before trusting it:
+
+```bash
+rclone size b2:YOUR_BUCKET/originals/
+```
+
+After that, use `https://kivimurd.ee/admin` to upload and tag — new uploads go
+to the bucket on their own.
 
 ## 9. Backups — do not skip this
 
-`Media/`, `src/data/photos.json` and `.data/orders.json` are the business.
+The B2 bucket, `src/data/photos.json` and `.data/orders.json` are the business.
 Losing the orders file means paying customers can no longer download.
 
 ```bash
@@ -147,8 +167,11 @@ SH
 chmod +x /etc/cron.daily/hkp-backup
 ```
 
-That covers the small files. **`Media/` needs an off-server copy too** — it is
-irreplaceable. Keep the originals on your Mac and an external drive as well.
+That covers the small files. B2 keeps its own redundant copies, so a failed
+disk won't lose the originals — but it will faithfully replicate a mistaken
+deletion. **The originals are irreplaceable: keep them on your Mac and an
+external drive as well.** Consider switching on Object Lock or lifecycle
+versioning on the bucket so an accidental delete is recoverable.
 
 ---
 
