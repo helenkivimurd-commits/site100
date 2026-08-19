@@ -43,12 +43,17 @@ const steps = [
   {
     n: "02",
     title: "Preview every shot",
-    body: "See every frame we caught of you — swim exit, bike leg, run — in full size before you buy.",
+    body: "See every frame we caught of you in full size before you buy.",
   },
   {
     n: "03",
     title: "Download and keep",
     body: "Buy the ones that get you, one at a time or as a bundle. High-resolution files, yours forever.",
+  },
+  {
+    n: "04",
+    title: "Credits",
+    body: "When using photos publicly, please credit the author (Helen Liis Kivimurd), unless agreed otherwise.",
   },
 ];
 
@@ -57,11 +62,16 @@ export default function Home() {
     <>
       {/* "Find my bib" targets the top of the hero, not the bib card lower down.
           scroll-mt clears the sticky header so the hero isn't tucked under it. */}
-      <section id="find" className="relative scroll-mt-[73px] overflow-hidden bg-ink sm:scroll-mt-[81px]">
-        {/* Kept under ~560px so the bib card's "Find my photos" button clears
-            the fold on a typical laptop — searching a bib is the whole point of
-            this page, and it was landing just below the viewport at 600px. */}
-        <div className="relative h-[440px] sm:h-[480px] lg:h-[540px]">
+      <section
+        id="find"
+        className="relative flex h-[calc(100svh-73px)] min-h-[600px] scroll-mt-[73px] flex-col overflow-hidden bg-ink sm:h-[calc(100svh-81px)] sm:scroll-mt-[81px]"
+      >
+        {/* Sized to exactly one screen below the sticky header, so the whole
+            hero — image, headline and bib card — is visible without scrolling.
+            svh rather than vh so mobile browser chrome can't crop the bottom.
+            The image flexes into whatever the card and its spacer leave over;
+            min-h on the section stops it collapsing on very short windows. */}
+        <div className="relative min-h-0 flex-1">
           <Image
             src="/photos/hero/dsc00009.jpg"
             alt="A finisher pumps his fist under the Ironman Tallinn finish arch"
@@ -129,12 +139,12 @@ export default function Home() {
         <PhotoGrid photos={previewPhotos} />
       </section>
 
-      <section className="bg-card">
+      <section id="how-it-works" className="scroll-mt-[73px] bg-card sm:scroll-mt-[81px]">
         <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24">
           <h2 className="mb-12 font-display text-4xl uppercase tracking-wide sm:text-5xl">
             How it works
           </h2>
-          <div className="grid grid-cols-1 gap-10 sm:grid-cols-3 sm:gap-8">
+          <div className="grid grid-cols-1 gap-10 sm:grid-cols-2 sm:gap-8 lg:grid-cols-4">
             {steps.map((step) => (
               <div key={step.n}>
                 <span className="font-mono text-sm text-blue">{step.n}</span>
@@ -175,12 +185,10 @@ export default function Home() {
               h_kivimurd Photography
             </p>
             <h2 className="mt-3 font-display text-3xl uppercase tracking-wide sm:text-4xl">
-              Shot on course, at the barriers, at the arch.
+              Nobody races alone out there.
             </h2>
             <p className="mt-3 text-sm text-muted">
-              I follow the race from swim start to red carpet finish so you don&apos;t have to
-              rely on your own race face selfie. One photographer, one race, thousands of
-              honest frames.
+              One photographer, one race, thousands of honest frames.
             </p>
           </div>
           <Link

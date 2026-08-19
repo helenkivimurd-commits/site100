@@ -15,7 +15,7 @@ export default function Footer() {
           />
           <p className="max-w-xs text-sm text-muted">
             Race-day photography from Ironman Tallinn and other Estonian events.
-            Find your bib, find your moment.
+            Find your bib, see it again.
           </p>
         </div>
 
@@ -29,6 +29,9 @@ export default function Footer() {
             </Link>
             <Link href="/#find" className="transition-colors hover:text-blue">
               Find my bib
+            </Link>
+            <Link href="/#how-it-works" className="transition-colors hover:text-blue">
+              How it works
             </Link>
           </div>
           <div className="flex flex-col gap-2">

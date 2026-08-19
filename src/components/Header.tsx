@@ -38,12 +38,15 @@ export default function Header() {
             />
           </Link>
 
-          <nav className="hidden items-center gap-8 font-mono text-sm uppercase tracking-wide text-ink md:flex">
+          <nav className="hidden items-center gap-8 font-mono text-sm uppercase tracking-wide text-ink lg:flex">
             <Link href="/#find" className="transition-colors hover:text-blue">
               Find my bib
             </Link>
             <Link href="/gallery" className="transition-colors hover:text-blue">
               All photos
+            </Link>
+            <Link href="/#how-it-works" className="transition-colors hover:text-blue">
+              How it works
             </Link>
             <Link href="/#pricing" className="transition-colors hover:text-blue">
               Pricing
@@ -84,7 +87,7 @@ export default function Header() {
 
             <button
               type="button"
-              className="flex items-center justify-center rounded-full border border-ink/15 p-2 md:hidden"
+              className="flex items-center justify-center rounded-full border border-ink/15 p-2 lg:hidden"
               onClick={() => setMenuOpen((v) => !v)}
               aria-label="Toggle menu"
               aria-expanded={menuOpen}
@@ -97,12 +100,15 @@ export default function Header() {
         </div>
 
         {menuOpen && (
-          <nav className="flex flex-col gap-1 border-t border-card px-5 py-3 font-mono text-sm uppercase tracking-wide md:hidden">
+          <nav className="flex flex-col gap-1 border-t border-card px-5 py-3 font-mono text-sm uppercase tracking-wide lg:hidden">
             <Link href="/#find" className="py-2" onClick={() => setMenuOpen(false)}>
               Find my bib
             </Link>
             <Link href="/gallery" className="py-2" onClick={() => setMenuOpen(false)}>
               All photos
+            </Link>
+            <Link href="/#how-it-works" className="py-2" onClick={() => setMenuOpen(false)}>
+              How it works
             </Link>
             <Link href="/#pricing" className="py-2" onClick={() => setMenuOpen(false)}>
               Pricing
