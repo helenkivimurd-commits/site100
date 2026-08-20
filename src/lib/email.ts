@@ -34,6 +34,10 @@ function receiptHtml(order: Order, baseUrl: string): string {
 export async function sendReceiptEmail(order: Order, baseUrl: string): Promise<boolean> {
   const apiKey = process.env.RESEND_API_KEY;
   const from = process.env.EMAIL_FROM;
+  // The From address has to sit on a domain verified with Resend, which rules
+  // out a gmail.com address. That address needs no mailbox of its own — but the
+  // receipt invites a reply, so point replies at one that is actually read.
+  const replyTo = process.env.EMAIL_REPLY_TO;
 
   if (!apiKey || !from) {
     console.warn("[email] RESEND_API_KEY or EMAIL_FROM not set — skipping receipt email.");
@@ -54,6 +58,7 @@ export async function sendReceiptEmail(order: Order, baseUrl: string): Promise<b
       body: JSON.stringify({
         from,
         to: [order.email],
+        ...(replyTo ? { reply_to: [replyTo] } : {}),
         subject: "Your race photos — h_kivimurd Photography",
         html: receiptHtml(order, baseUrl),
       }),

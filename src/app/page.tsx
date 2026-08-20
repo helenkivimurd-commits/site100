@@ -6,8 +6,7 @@ import { photos } from "@/lib/catalog";
 import { formatMoney } from "@/lib/money";
 import {
   SINGLE_PRICE,
-  BUNDLE_5_THRESHOLD,
-  BUNDLE_10_THRESHOLD,
+  BUNDLE_THRESHOLD,
   pricePerPhotoAt,
   bundleTotalAt,
 } from "@/lib/pricing";
@@ -16,21 +15,23 @@ const previewPhotos = photos.slice(0, 8);
 
 // Prices come from src/lib/pricing.ts — change the numbers there and this
 // section (and the actual basket math) updates everywhere automatically.
+// Both cards lead with a PER-PHOTO price so they compare like for like. Showing
+// the bundle's total instead ("3+ ... EUR12") read as a flat fee for any number
+// of photos, which is not what the basket charges.
 const pricingTiers = [
   {
-    name: "Single photo",
-    price: SINGLE_PRICE,
+    name: "One or two photos",
     perPhoto: SINGLE_PRICE,
+    note: "Pick out just the frames you want.",
   },
   {
-    name: `Bundle of ${BUNDLE_5_THRESHOLD}`,
-    price: bundleTotalAt(BUNDLE_5_THRESHOLD),
-    perPhoto: pricePerPhotoAt(BUNDLE_5_THRESHOLD),
-  },
-  {
-    name: `Bundle of ${BUNDLE_10_THRESHOLD}+`,
-    price: bundleTotalAt(BUNDLE_10_THRESHOLD),
-    perPhoto: pricePerPhotoAt(BUNDLE_10_THRESHOLD),
+    name: `${BUNDLE_THRESHOLD} photos or more`,
+    perPhoto: pricePerPhotoAt(BUNDLE_THRESHOLD),
+    note: `Every photo in your basket drops to ${formatMoney(
+      pricePerPhotoAt(BUNDLE_THRESHOLD)
+    )} — so ${BUNDLE_THRESHOLD} photos come to ${formatMoney(
+      bundleTotalAt(BUNDLE_THRESHOLD)
+    )}, six to ${formatMoney(6 * pricePerPhotoAt(6))}.`,
   },
 ];
 
@@ -163,16 +164,17 @@ export default function Home() {
         <p className="mt-3 max-w-xl text-sm text-muted">
           Every photo is priced individually. Buy in bundles and the price per photo drops.
         </p>
-        <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <div className="mt-10 grid grid-cols-1 gap-4 sm:grid-cols-2">
           {pricingTiers.map((tier) => (
             <div key={tier.name} className="rounded-md bg-card p-6">
               <p className="font-mono text-xs uppercase tracking-[0.2em] text-muted">{tier.name}</p>
               <p className="mt-3 font-display text-4xl tracking-wide text-blue">
-                {formatMoney(tier.price)}
+                {formatMoney(tier.perPhoto)}
+                <span className="ml-2 font-mono text-base tracking-normal text-muted">
+                  per photo
+                </span>
               </p>
-              <p className="mt-2 font-mono text-sm text-muted">
-                {formatMoney(tier.perPhoto)} per photo
-              </p>
+              <p className="mt-2 text-sm text-muted">{tier.note}</p>
             </div>
           ))}
         </div>
