@@ -35,10 +35,10 @@ export default function AboutPage() {
         <p>Thank you for letting me be part of your day!</p>
       </div>
 
-      <div className="relative mx-auto mt-14 aspect-[900/1371] w-full max-w-sm overflow-hidden rounded-md bg-card">
+      <div className="relative mx-auto mt-14 aspect-[900/1600] w-full max-w-sm overflow-hidden rounded-md bg-card">
         <Image
-          src="/images/photographer.jpg"
-          alt="h_kivimurd, the photographer behind the camera"
+          src="/images/helen-kivimurd.jpg"
+          alt="Helen Kivimurd, the photographer behind the camera"
           fill
           sizes="(min-width: 640px) 384px, 100vw"
           className="object-cover"

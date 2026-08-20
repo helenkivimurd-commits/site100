@@ -11,7 +11,7 @@ export default function Footer() {
             alt="h_kivimurd Photography"
             width={360}
             height={184}
-            className="h-24 w-auto sm:h-28"
+            className="h-24 w-auto self-start sm:h-28"
           />
           <p className="max-w-xs text-sm text-muted">
             Race-day photography from Ironman Tallinn and other Estonian events.
@@ -19,9 +19,11 @@ export default function Footer() {
           </p>
         </div>
 
-        {/* Flex (not an equal-width grid) from sm up, so the Contact column can
-            size to the email address instead of wrapping it mid-word. */}
-        <div className="grid grid-cols-2 gap-8 font-mono text-sm sm:flex sm:gap-12">
+        {/* One column on phones and flex (not an equal-width grid) from sm up, both
+            for the same reason: the email address needs 196px to sit on one line,
+            and a half-width column on a 375px screen only offers 152px, which
+            broke it mid-word. */}
+        <div className="grid grid-cols-1 gap-8 font-mono text-sm sm:flex sm:gap-12">
           <div className="flex flex-col gap-2">
             <span className="uppercase tracking-wide text-muted">Shop</span>
             <Link href="/gallery" className="transition-colors hover:text-blue">
@@ -41,12 +43,12 @@ export default function Footer() {
             </Link>
             <a
               href="mailto:helen.kivimurd@gmail.com"
-              className="break-all transition-colors hover:text-blue sm:whitespace-nowrap sm:break-normal"
+              className="whitespace-nowrap transition-colors hover:text-blue"
             >
               helen.kivimurd@gmail.com
             </a>
           </div>
-          <div className="col-span-2 flex flex-col gap-2 sm:col-span-1">
+          <div className="flex flex-col gap-2">
             <span className="uppercase tracking-wide text-muted">Socials</span>
             <a
               href="https://instagram.com/h_kivimurd"
