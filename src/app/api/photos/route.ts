@@ -25,6 +25,21 @@ function extensionOf(filename: string): string {
   return path.extname(filename).toLowerCase();
 }
 
+// Raised when sharp cannot decode or process a file the extension check let
+// through. The underlying message is included rather than guessed at: an
+// earlier version blamed iPhone HEIC for every failure, which sent the
+// photographer off converting files that were never the problem.
+class UnprocessableImage extends Error {
+  constructor(filename: string, cause: unknown) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    const heic = /heif|heic/i.test(reason)
+      ? " HEIC files from recent iPhones often fail here — open it in Preview, File > Export, and choose JPEG."
+      : "";
+    super(`"${filename}" couldn't be processed: ${reason}.${heic}`);
+    this.cause = cause;
+  }
+}
+
 // Every write below goes through this queue so concurrent requests (e.g.
 // uploading several photos, or editing two rows at once) can't interleave
 // their read-modify-write cycles and corrupt photos.json.
@@ -105,51 +120,65 @@ export async function POST(request: Request) {
     );
   }
 
-  const created = await withQueue(async () => {
-    await fs.mkdir(PREVIEW_DIR, { recursive: true });
-    await fs.mkdir(THUMB_DIR, { recursive: true });
+  let created: (StoredPhoto & { id: string })[];
+  try {
+    created = await withQueue(async () => {
+      await fs.mkdir(PREVIEW_DIR, { recursive: true });
+      await fs.mkdir(THUMB_DIR, { recursive: true });
 
-    const data = await readData();
-    const existingIds = new Set(Object.keys(data));
-    const entries: (StoredPhoto & { id: string })[] = [];
+      const data = await readData();
+      const existingIds = new Set(Object.keys(data));
+      const entries: (StoredPhoto & { id: string })[] = [];
 
-    for (const file of files) {
-      const arrayBuffer = await file.arrayBuffer();
-      const source = Buffer.from(arrayBuffer);
-      const id = slugifyFilename(file.name, existingIds);
-      existingIds.add(id);
+      for (const file of files) {
+        const arrayBuffer = await file.arrayBuffer();
+        const source = Buffer.from(arrayBuffer);
+        const id = slugifyFilename(file.name, existingIds);
+        existingIds.add(id);
 
-      const processed = await processUploadedPhoto(source);
-      await fs.writeFile(path.join(PREVIEW_DIR, `${id}.jpg`), processed.preview.buffer);
-      await fs.writeFile(path.join(THUMB_DIR, `${id}.jpg`), processed.thumb.buffer);
-      // Keep the original for future reprocessing (e.g. a bigger watermark, a new hero crop)
-      // and for the paid download. It goes to object storage, never to this
-      // server's disk and never under public/.
-      //
-      // Keyed on `id`, never on file.name: the browser controls that string, and
-      // `id` is already reduced to [a-z0-9-]. Naming the object after it is also
-      // what guarantees findOriginal() can match it back to this photo.
-      await putOriginal(id, extensionOf(file.name), source);
+        let processed;
+        try {
+          processed = await processUploadedPhoto(source);
+        } catch (err) {
+          throw new UnprocessableImage(file.name, err);
+        }
+        await fs.writeFile(path.join(PREVIEW_DIR, `${id}.jpg`), processed.preview.buffer);
+        await fs.writeFile(path.join(THUMB_DIR, `${id}.jpg`), processed.thumb.buffer);
+        // Keep the original for future reprocessing (e.g. a bigger watermark, a new hero crop)
+        // and for the paid download. It goes to object storage, never to this
+        // server's disk and never under public/.
+        //
+        // Keyed on `id`, never on file.name: the browser controls that string, and
+        // `id` is already reduced to [a-z0-9-]. Naming the object after it is also
+        // what guarantees findOriginal() can match it back to this photo.
+        await putOriginal(id, extensionOf(file.name), source);
 
-      const entry: StoredPhoto = {
-        title: file.name.replace(/\.[^./]+$/, ""),
-        event,
-        day,
-        discipline: discipline as StoredPhoto["discipline"],
-        width: processed.preview.width,
-        height: processed.preview.height,
-        thumbWidth: processed.thumb.width,
-        thumbHeight: processed.thumb.height,
-        bibs: [],
-        reviewed: false,
-      };
-      data[id] = entry;
-      entries.push({ id, ...entry });
+        const entry: StoredPhoto = {
+          title: file.name.replace(/\.[^./]+$/, ""),
+          event,
+          day,
+          discipline: discipline as StoredPhoto["discipline"],
+          width: processed.preview.width,
+          height: processed.preview.height,
+          thumbWidth: processed.thumb.width,
+          thumbHeight: processed.thumb.height,
+          bibs: [],
+          reviewed: false,
+        };
+        data[id] = entry;
+        entries.push({ id, ...entry });
+      }
+
+      await writeData(data);
+      return entries;
+    });
+  } catch (err) {
+    if (err instanceof UnprocessableImage) {
+      console.error(`[upload] ${err.message}`, err.cause);
+      return NextResponse.json({ error: err.message }, { status: 422 });
     }
-
-    await writeData(data);
-    return entries;
-  });
+    throw err;
+  }
 
   return NextResponse.json({ ok: true, created });
 }

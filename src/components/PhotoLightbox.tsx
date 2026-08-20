@@ -59,7 +59,7 @@ export default function PhotoLightbox({
               a fixed container forces every landscape shot into thick black
               bars. Width-led sizing means the common case has none at all. */}
           <Image
-            src={`/photos/preview/${photo.id}.jpg`}
+            src={`/api/photo/preview/${photo.id}`}
             alt={photoLabel(photo)}
             width={photo.width}
             height={photo.height}

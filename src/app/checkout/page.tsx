@@ -121,7 +121,7 @@ export default function CheckoutPage() {
               <li key={photo.id} className="flex gap-3">
                 <div className="relative h-14 w-20 shrink-0 overflow-hidden rounded bg-page">
                   <Image
-                    src={`/photos/thumb/${photo.id}.jpg`}
+                    src={`/api/photo/thumb/${photo.id}`}
                     alt={photo.bibs.length > 0 ? `Bib ${photo.bibs.join(", ")}` : photo.day}
                     fill
                     sizes="80px"

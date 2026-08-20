@@ -108,7 +108,7 @@ export default function DownloadsPage() {
               <li key={photo.id} className="flex items-center gap-4 py-4">
                 <div className="relative h-16 w-24 shrink-0 overflow-hidden rounded bg-card">
                   <Image
-                    src={`/photos/thumb/${photo.id}.jpg`}
+                    src={`/api/photo/thumb/${photo.id}`}
                     alt={photo.bibs.length > 0 ? `Bib ${photo.bibs.join(", ")}` : photo.id}
                     fill
                     sizes="96px"

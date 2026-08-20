@@ -63,8 +63,24 @@ export default function AdminPage() {
     setFilter("unreviewed");
   }
 
+// `day` is stored as the string shown to customers — on photo cards, in the
+// cart, on the Stripe line item — and is what the gallery's day filter groups
+// on. <input type="date"> only speaks ISO, so the picker holds the ISO value
+// and this turns it into the display form: "2026-08-23" -> "Sunday, August 23".
+function formatRaceDay(iso: string): string {
+  const [y, m, d] = iso.split("-").map(Number);
+  if (!y || !m || !d) return "";
+  // Built from parts, not parsed from the string: new Date("2026-08-23") is
+  // read as UTC midnight, which lands on the day before in western timezones.
+  return new Date(y, m - 1, d).toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  });
+}
+
   const [uploadEvent, setUploadEvent] = useState(FALLBACK_EVENT);
-  const [uploadDay, setUploadDay] = useState("");
+  const [uploadDay, setUploadDay] = useState(() => new Date().toLocaleDateString("en-CA"));
   const [uploadDiscipline, setUploadDiscipline] = useState<Discipline>("Run");
   const [uploading, setUploading] = useState(false);
   const [uploadStatus, setUploadStatus] = useState("");
@@ -85,7 +101,6 @@ export default function AdminPage() {
       const last = body.photos[body.photos.length - 1];
       if (last) {
         setUploadEvent(last.event ?? FALLBACK_EVENT);
-        setUploadDay(last.day);
       }
       setLoading(false);
     })();
@@ -101,6 +116,11 @@ export default function AdminPage() {
   const reviewedCount = rows.filter((r) => r.reviewed).length;
   const stillUntagged = visible.filter((r) => !r.reviewed).length;
 
+  // One request per photo rather than one for the whole selection. A batch of
+  // camera JPEGs is 7MB each, so twenty at once is 140MB — past any sane body
+  // limit, and the proxy silently truncated it ("expected boundary after body").
+  // Sending them one at a time also means a single bad file doesn't lose the
+  // rest of the batch, and the count below is real progress rather than a guess.
   async function handleUpload(files: FileList | File[]) {
     const list = Array.from(files);
     if (list.length === 0) return;
@@ -110,36 +130,48 @@ export default function AdminPage() {
     }
 
     setUploading(true);
-    setUploadStatus(`Uploading ${list.length} photo${list.length === 1 ? "" : "s"}…`);
 
-    const form = new FormData();
-    for (const file of list) form.append("files", file);
-    form.append("event", uploadEvent.trim());
-    form.append("day", uploadDay.trim());
-    form.append("discipline", uploadDiscipline);
+    const day = formatRaceDay(uploadDay);
+    const event = uploadEvent.trim();
+    const added: RowSource[] = [];
+    const failed: string[] = [];
 
-    const res = await fetch("/api/photos", { method: "POST", body: form });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      setUploadStatus(body.error ?? "Upload failed. Try again.");
-      setUploading(false);
-      return;
+    for (const [index, file] of list.entries()) {
+      setUploadStatus(`Uploading ${index + 1} of ${list.length}: ${file.name}…`);
+
+      const form = new FormData();
+      form.append("files", file);
+      form.append("event", event);
+      form.append("day", day);
+      form.append("discipline", uploadDiscipline);
+
+      try {
+        const res = await fetch("/api/photos", { method: "POST", body: form });
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}));
+          failed.push(body.error ?? `${file.name} failed.`);
+          continue;
+        }
+        const body = (await res.json()) as { created: RowSource[] };
+        added.push(...body.created);
+
+        // Appended as each one lands, so a long batch fills the list as it goes
+        // instead of sitting blank until the end.
+        setRows((prev) => [...prev, ...body.created.map(toRow)]);
+        setUnreviewedSnapshot((prev) => {
+          const next = new Set(prev);
+          for (const photo of body.created) next.add(photo.id);
+          return next;
+        });
+      } catch {
+        failed.push(`${file.name} — connection lost.`);
+      }
     }
 
-    // Append the new rows in place rather than reloading, so the page doesn't
-    // jump back to the top and lose your scroll position mid-session.
-    const body = (await res.json()) as { created: RowSource[] };
-    setRows((prev) => [...prev, ...body.created.map(toRow)]);
-    // Fresh uploads are untagged, so add them to the snapshot too — otherwise
-    // they'd be invisible while "Unreviewed only" is on.
-    setUnreviewedSnapshot((prev) => {
-      const next = new Set(prev);
-      for (const photo of body.created) next.add(photo.id);
-      return next;
-    });
-    setUploadStatus(
-      `Added ${body.created.length} photo${body.created.length === 1 ? "" : "s"} at the bottom of the list.`
-    );
+    const parts = [];
+    if (added.length) parts.push(`Added ${added.length} photo${added.length === 1 ? "" : "s"}.`);
+    if (failed.length) parts.push(`${failed.length} failed: ${failed[0]}`);
+    setUploadStatus(parts.join(" ") || "Nothing uploaded.");
     setUploading(false);
   }
 
@@ -220,11 +252,16 @@ export default function AdminPage() {
           <div className="flex flex-col gap-1.5">
             <label className="text-xs text-muted">Day</label>
             <input
+              type="date"
               value={uploadDay}
               onChange={(e) => setUploadDay(e.target.value)}
-              placeholder="e.g. Sun, Aug 25"
               className="rounded-md border border-ink/15 bg-page px-3 py-2 text-sm outline-none focus:border-blue"
             />
+            {/* The picker shows a calendar; this shows what customers will
+                actually read on the photo, so it can be checked before upload. */}
+            <p className="font-mono text-xs text-muted">
+              {formatRaceDay(uploadDay) || "Pick a date"}
+            </p>
           </div>
           <div className="flex flex-col gap-1.5">
             <label className="text-xs text-muted">Discipline</label>
@@ -317,7 +354,7 @@ export default function AdminPage() {
               className="group relative h-16 w-24 shrink-0 overflow-hidden rounded bg-card"
             >
               <Image
-                src={`/photos/thumb/${row.id}.jpg`}
+                src={`/api/photo/thumb/${row.id}`}
                 alt={row.title}
                 fill
                 sizes="96px"

@@ -27,7 +27,7 @@ export default function PhotoCard({
         aria-label={`View photo ${photo.id.toUpperCase()}`}
       >
         <Image
-          src={`/photos/thumb/${photo.id}.jpg`}
+          src={`/api/photo/thumb/${photo.id}`}
           alt={photoLabel(photo)}
           fill
           sizes="(min-width: 1024px) 23vw, (min-width: 640px) 45vw, 90vw"

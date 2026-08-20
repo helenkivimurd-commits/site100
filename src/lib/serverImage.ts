@@ -1,57 +1,65 @@
 import sharp from "sharp";
+import { promises as fs } from "node:fs";
+import path from "node:path";
 
-// Mirrors the watermark styling in scripts/process-photos.mjs — keep both in
-// sync if the look changes (the script exists for reprocessing everything at
-// once; this runs per-upload from the admin page).
-function watermarkSvg(width: number, height: number): Buffer {
-  const tile = Math.round(Math.max(width, height) / 3);
-  const fontSize = Math.max(26, Math.round(tile * 0.16));
-  return Buffer.from(`
-  <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
-    <defs>
-      <pattern id="wm" width="${tile}" height="${tile}" patternTransform="rotate(-30)" patternUnits="userSpaceOnUse">
-        <text x="0" y="${tile / 2}" font-family="Helvetica, Arial, sans-serif" font-size="${fontSize}" font-weight="700" fill="#ffffff" fill-opacity="0.4" letter-spacing="2">h_kivimurd</text>
-      </pattern>
-    </defs>
-    <rect width="100%" height="100%" fill="url(#wm)" />
-  </svg>`);
+// The watermark is a pre-rendered PNG, not an SVG drawn per upload.
+//
+// It used to be an SVG composited at request time. That works in a plain Node
+// script, but inside Next's server runtime libvips' SVG loader is unreliable:
+// every composite failed with "Input buffer contains unsupported image format"
+// in a production build, and in dev it worked until the first hot reload and
+// then failed for the life of the process. Uploads failed 100% of the time
+// once it tipped over.
+//
+// Resizing and compositing a PNG uses none of that machinery, so the upload
+// path no longer depends on it. Regenerate the file with the snippet in
+// ARCHITECTURE.md if the watermark styling ever changes.
+const WATERMARK_PATH = path.join(process.cwd(), "public", "images", "watermark.png");
+
+// Read once per process rather than per photo — a batch of 200 uploads would
+// otherwise re-read the same 361KB file 400 times.
+let watermarkPromise: Promise<Buffer> | null = null;
+function watermark(): Promise<Buffer> {
+  watermarkPromise ??= fs.readFile(WATERMARK_PATH);
+  return watermarkPromise;
 }
 
 export type ProcessedRender = { buffer: Buffer; width: number; height: number };
 export type ProcessedPhoto = { preview: ProcessedRender; thumb: ProcessedRender };
 
-// Resizes + watermarks one uploaded photo into preview and thumb renders,
-// matching what scripts/process-photos.mjs produces for the bulk library.
+// Scaled to cover rather than stretched to fit, so the lettering keeps its
+// shape on portrait and landscape alike.
+async function watermarked(
+  source: Buffer,
+  width: number,
+  quality: number
+): Promise<ProcessedRender> {
+  const base = await sharp(source)
+    .rotate()
+    .resize({ width, withoutEnlargement: true })
+    .toBuffer({ resolveWithObject: true });
+
+  const overlay = await sharp(await watermark())
+    .resize(base.info.width, base.info.height, { fit: "cover" })
+    .toBuffer();
+
+  const buffer = await sharp(base.data)
+    .composite([{ input: overlay }])
+    .jpeg({ quality, mozjpeg: true })
+    .toBuffer();
+
+  return { buffer, width: base.info.width, height: base.info.height };
+}
+
+// Resizes + watermarks one uploaded photo into preview and thumb renders.
 export async function processUploadedPhoto(source: Buffer): Promise<ProcessedPhoto> {
   const srcMeta = await sharp(source).rotate().metadata();
   const isPortrait = (srcMeta.height ?? 0) > (srcMeta.width ?? 0);
 
-  const previewWidth = isPortrait ? 1100 : 1600;
-  const previewBase = await sharp(source)
-    .rotate()
-    .resize({ width: previewWidth, withoutEnlargement: true })
-    .toBuffer({ resolveWithObject: true });
-  const previewSvg = watermarkSvg(previewBase.info.width, previewBase.info.height);
-  const previewBuffer = await sharp(previewBase.data)
-    .composite([{ input: previewSvg }])
-    .jpeg({ quality: 80, mozjpeg: true })
-    .toBuffer();
+  const preview = await watermarked(source, isPortrait ? 1100 : 1600, 80);
+  const thumb = await watermarked(source, isPortrait ? 700 : 900, 76);
 
-  const thumbWidth = isPortrait ? 700 : 900;
-  const thumbBase = await sharp(source)
-    .rotate()
-    .resize({ width: thumbWidth, withoutEnlargement: true })
-    .toBuffer({ resolveWithObject: true });
-  const thumbSvg = watermarkSvg(thumbBase.info.width, thumbBase.info.height);
-  const thumbBuffer = await sharp(thumbBase.data)
-    .composite([{ input: thumbSvg }])
-    .jpeg({ quality: 76, mozjpeg: true })
-    .toBuffer();
-
-  return {
-    preview: { buffer: previewBuffer, width: previewBase.info.width, height: previewBase.info.height },
-    thumb: { buffer: thumbBuffer, width: thumbBase.info.width, height: thumbBase.info.height },
-  };
+  return { preview, thumb };
 }
 
 // Turns "DSC_0142 finish line!.jpg" into "dsc-0142-finish-line", then makes

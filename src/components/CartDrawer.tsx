@@ -6,7 +6,7 @@ import { useEffect } from "react";
 import { useCart } from "./CartProvider";
 import { formatMoney } from "@/lib/money";
 import { purchaseLabel } from "@/lib/photoTitle";
-import { bundleLabel, bundleSubLabel, BUNDLE_5_THRESHOLD, BUNDLE_10_THRESHOLD } from "@/lib/pricing";
+import { bundleLabel, bundleSubLabel, BUNDLE_THRESHOLD } from "@/lib/pricing";
 
 export default function CartDrawer() {
   const { drawerOpen, closeDrawer, items, remove, subtotal, discount, total, bundleTier } =
@@ -71,7 +71,7 @@ export default function CartDrawer() {
                 <li key={photo.id} className="flex gap-3 border-b border-card py-4 first:pt-0">
                   <div className="relative h-20 w-28 shrink-0 overflow-hidden rounded-md bg-card">
                     <Image
-                      src={`/photos/thumb/${photo.id}.jpg`}
+                      src={`/api/photo/thumb/${photo.id}`}
                       alt={photo.bibs.length > 0 ? `Bib ${photo.bibs.join(", ")}` : photo.day}
                       fill
                       sizes="112px"
@@ -102,7 +102,7 @@ export default function CartDrawer() {
             <div className="border-t border-card px-6 py-5">
               {bundleTier === "none" && (
                 <p className="mb-3 text-xs text-muted">
-                  Add {BUNDLE_5_THRESHOLD - items.length} more for a bundle discount.
+                  Add {BUNDLE_THRESHOLD - items.length} more for a bundle discount.
                 </p>
               )}
               {bundleTier !== "none" && (
@@ -110,11 +110,6 @@ export default function CartDrawer() {
                   <span className="font-mono uppercase tracking-wide">{bundleLabel(bundleTier)}</span>
                   <span className="font-mono">{bundleSubLabel(bundleTier)}</span>
                 </div>
-              )}
-              {bundleTier === "bundle5" && (
-                <p className="mb-3 text-xs text-muted">
-                  Add {BUNDLE_10_THRESHOLD - items.length} more for an even bigger discount.
-                </p>
               )}
               <div className="flex items-center justify-between text-sm text-muted">
                 <span>Subtotal</span>
