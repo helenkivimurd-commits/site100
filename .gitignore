@@ -7,6 +7,9 @@ build/
 .env
 .env.local
 .env*.local
+# nano leaves .env.local.save on an interrupted edit, which the pattern above
+# does not match — this catches every variant so no secrets can be committed.
+.env*
 
 # Order records and download tokens (generated at runtime)
 .data/
