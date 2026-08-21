@@ -1,6 +1,5 @@
-import { promises as fs } from "node:fs";
-import path from "node:path";
 import crypto from "node:crypto";
+import { ORDERS_FILE, readJsonFile, writeJsonFileAtomic } from "./storage";
 
 // Orders live in a JSON file like the photo catalog does. That's fine on a
 // server with a real disk; on a read-only serverless host (Vercel) this needs
@@ -8,7 +7,8 @@ import crypto from "node:crypto";
 //
 // Deliberately outside src/ — this file is written on every purchase, and
 // runtime writes inside the source tree can make the dev server rebuild.
-const DATA_FILE = path.join(process.cwd(), ".data", "orders.json");
+// Location, atomic write and corrupt-file handling all live in storage.ts.
+const DATA_FILE = ORDERS_FILE;
 
 const DOWNLOAD_DAYS = 30;
 
@@ -38,18 +38,17 @@ function withQueue<T>(fn: () => Promise<T>): Promise<T> {
   return result;
 }
 
+// No file yet means no orders yet. A file that exists but will not parse throws
+// instead of reading as empty — returning {} there would let the next order
+// overwrite every paid order already recorded.
 async function readData(): Promise<Record<string, Order>> {
-  try {
-    return JSON.parse(await fs.readFile(DATA_FILE, "utf-8"));
-  } catch {
-    // First order ever, or the file was cleared — start empty.
-    return {};
-  }
+  return readJsonFile<Record<string, Order>>(DATA_FILE, {});
 }
 
+// Atomic. This file holds what customers paid for and the tokens that let them
+// download it, and it is rewritten in full on every order and every webhook.
 async function writeData(data: Record<string, Order>) {
-  await fs.mkdir(path.dirname(DATA_FILE), { recursive: true });
-  await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2) + "\n");
+  await writeJsonFileAtomic(DATA_FILE, data);
 }
 
 // URL-safe and long enough that guessing one is not worth anyone's time.
