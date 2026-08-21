@@ -4,7 +4,17 @@
 # Caddy obtains and renews the HTTPS certificate automatically. Nothing to do
 # beyond pointing the domain's A record at this server first.
 
-helenkivimurd.com, www.helenkivimurd.com {
+# www redirects to the bare domain rather than serving a second copy of the
+# site. Both names resolve here, and serving both meant a customer who arrived
+# on www had their basket saved against that hostname — then Stripe returned
+# them to NEXT_PUBLIC_BASE_URL (the bare domain), where localStorage is a
+# different store and the basket looked empty. Search engines also treated the
+# two as duplicate sites. 301 so browsers and crawlers remember it.
+www.helenkivimurd.com {
+	redir https://helenkivimurd.com{uri} permanent
+}
+
+helenkivimurd.com {
 	encode zstd gzip
 
 	# Sets X-Forwarded-For and X-Forwarded-Proto, which the app's rate limiter
