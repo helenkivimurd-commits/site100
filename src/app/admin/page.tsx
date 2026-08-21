@@ -16,6 +16,10 @@ type Row = {
   reviewed: boolean;
   saving: boolean;
   saved: boolean;
+  // Set when the server rejected the last save. Without this a failed PATCH
+  // still rendered "Saved" and the edit looked like it had stuck — which is
+  // exactly how 14 bib edits were silently lost.
+  error: string | null;
   deleting: boolean;
 };
 
@@ -43,6 +47,7 @@ function toRow(p: RowSource): Row {
     reviewed: p.reviewed,
     saving: false,
     saved: false,
+    error: null,
     deleting: false,
   };
 }
@@ -188,16 +193,35 @@ function formatRaceDay(iso: string): string {
   }
 
   async function save(id: string, fields: Partial<{ bibs: string[]; reviewed: boolean; day: string; discipline: Discipline; title: string }>) {
-    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, saving: true, saved: false } : r)));
+    setRows((prev) => prev.map((r) => (r.id === id ? { ...r, saving: true, saved: false, error: null } : r)));
 
-    await fetch("/api/photos", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ id, ...fields }),
-    });
+    // The response has to be checked. When the server could not write the
+    // catalogue at all, every PATCH came back 500 and this still reported
+    // "Saved", so the edits looked done and were not.
+    let error: string | null = null;
+    try {
+      const res = await fetch("/api/photos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...fields }),
+      });
+      if (!res.ok) {
+        const body = (await res.json().catch(() => ({}))) as { error?: string };
+        error = body.error ?? `Save failed (${res.status})`;
+      }
+    } catch {
+      error = "Save failed — no connection";
+    }
 
     setRows((prev) =>
-      prev.map((r) => (r.id === id ? { ...r, ...fields, bibsText: fields.bibs ? fields.bibs.join(", ") : r.bibsText, saving: false, saved: true } : r))
+      prev.map((r) =>
+        r.id === id
+          ? error
+            // Keep what was typed, so nothing has to be retyped on a retry.
+            ? { ...r, saving: false, saved: false, error }
+            : { ...r, ...fields, bibsText: fields.bibs ? fields.bibs.join(", ") : r.bibsText, saving: false, saved: true, error: null }
+          : r
+      )
     );
   }
 
@@ -261,18 +285,33 @@ function formatRaceDay(iso: string): string {
 
     setBulkBusy(true);
     let done = 0;
+    // Only the ids the server actually accepted get their row updated, so the
+    // list never shows a change that did not happen.
+    const applied: string[] = [];
+    const failed: string[] = [];
     for (const id of ids) {
       done += 1;
       setBulkStatus(`Updating ${done} of ${ids.length}…`);
-      await fetch("/api/photos", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id, ...fields }),
-      });
+      try {
+        const res = await fetch("/api/photos", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id, ...fields }),
+        });
+        if (res.ok) applied.push(id);
+        else failed.push(id);
+      } catch {
+        failed.push(id);
+      }
     }
 
-    setRows((prev) => prev.map((r) => (selected.has(r.id) ? { ...r, ...fields } : r)));
-    setBulkStatus(`Updated ${ids.length} photo${ids.length === 1 ? "" : "s"}.`);
+    const appliedSet = new Set(applied);
+    setRows((prev) => prev.map((r) => (appliedSet.has(r.id) ? { ...r, ...fields } : r)));
+    setBulkStatus(
+      failed.length === 0
+        ? `Updated ${applied.length} photo${applied.length === 1 ? "" : "s"}.`
+        : `Updated ${applied.length}, but ${failed.length} failed — try those again.`
+    );
     setBulkBusy(false);
   }
 
@@ -288,22 +327,46 @@ function formatRaceDay(iso: string): string {
 
     setBulkBusy(true);
     let done = 0;
+    const removed = new Set<string>();
+    let failed = 0;
     for (const id of ids) {
       done += 1;
       setBulkStatus(`Deleting ${done} of ${ids.length}…`);
-      await fetch(`/api/photos?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      try {
+        const res = await fetch(`/api/photos?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+        if (res.ok) removed.add(id);
+        else failed += 1;
+      } catch {
+        failed += 1;
+      }
     }
-    setRows((prev) => prev.filter((r) => !selected.has(r.id)));
+    // Anything the server refused to delete stays in the list, rather than
+    // disappearing from view while still existing.
+    setRows((prev) => prev.filter((r) => !removed.has(r.id)));
     setSelected(new Set());
-    setBulkStatus(`Deleted ${ids.length} photo${ids.length === 1 ? "" : "s"}.`);
+    setBulkStatus(
+      failed === 0
+        ? `Deleted ${removed.size} photo${removed.size === 1 ? "" : "s"}.`
+        : `Deleted ${removed.size}, but ${failed} failed.`
+    );
     setBulkBusy(false);
   }
 
   async function deletePhoto(id: string) {
     if (!window.confirm("Delete this photo? This removes the files and can't be undone.")) return;
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, deleting: true } : r)));
-    await fetch(`/api/photos?id=${encodeURIComponent(id)}`, { method: "DELETE" });
-    setRows((prev) => prev.filter((r) => r.id !== id));
+    let ok = false;
+    try {
+      const res = await fetch(`/api/photos?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      ok = res.ok;
+    } catch {
+      ok = false;
+    }
+    setRows((prev) =>
+      ok
+        ? prev.filter((r) => r.id !== id)
+        : prev.map((r) => (r.id === id ? { ...r, deleting: false, error: "Delete failed" } : r))
+    );
   }
 
   return (
@@ -583,6 +646,10 @@ function formatRaceDay(iso: string): string {
             <span className="w-14 shrink-0 text-right font-mono text-xs">
               {row.saving ? (
                 <span className="text-muted">Saving…</span>
+              ) : row.error ? (
+                <span className="text-red-600" title={row.error}>
+                  Not saved
+                </span>
               ) : row.saved ? (
                 <span className="text-blue">Saved</span>
               ) : row.reviewed ? (

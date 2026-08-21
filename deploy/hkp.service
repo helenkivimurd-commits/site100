@@ -31,7 +31,12 @@ ProtectHome=true
 # is deliberately no Media path any more: full-resolution originals live in the
 # B2 bucket, not on this disk. Listing a directory that does not exist makes
 # systemd refuse to start the unit at all (status=226/NAMESPACE).
-ReadWritePaths=/srv/hkp/site
+# ProtectSystem=strict makes the whole filesystem read-only for this service,
+# so every directory it writes to must be listed here. Live data (the catalogue
+# and the renders) lives outside /srv/hkp/site on purpose — see src/lib/storage.ts
+# — and leaving those two paths off this line makes every upload and every bib
+# edit fail with EROFS while the admin page still says "Saved".
+ReadWritePaths=/srv/hkp/site /srv/hkp/data /srv/hkp/renders
 
 [Install]
 WantedBy=multi-user.target
