@@ -86,7 +86,7 @@ export default function AboutPage() {
                     strokeLinejoin="round"
                   />
                 </svg>
-                Facebook
+                Helenkivimurd.photography
               </a>
             </div>
           </div>

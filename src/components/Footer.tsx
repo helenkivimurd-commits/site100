@@ -77,7 +77,7 @@ export default function Footer() {
                   strokeLinejoin="round"
                 />
               </svg>
-              Helen Kivimurd Photography
+              Helenkivimurd.photography
             </a>
           </div>
         </div>
