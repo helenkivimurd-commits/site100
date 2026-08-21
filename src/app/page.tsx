@@ -52,7 +52,7 @@ const steps = [
   {
     n: "04",
     title: "Credits",
-    body: "When using photos publicly, please credit the author (Helen Liis Kivimurd), unless agreed otherwise.",
+    body: "When using photos publicly, please credit the author (Helen Kivimurd), unless agreed otherwise.",
   },
 ];
 
