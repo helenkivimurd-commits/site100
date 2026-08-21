@@ -13,6 +13,14 @@ function receiptHtml(order: Order, baseUrl: string): string {
     })
     .join("");
 
+  // The amount paid belongs here, with the photos, not only in the footer.
+  // Mail clients collapse the end of a message behind "show trimmed content" —
+  // Gmail does it as soon as it recognises a block it has seen in the thread
+  // before — and a total nobody can see without clicking is no use on a receipt.
+  const totalRow = `<tr><td style="padding:14px 0 0;font-size:14px;font-weight:600;color:#14162b">Total paid</td><td style="padding:14px 0 0;text-align:right;font-family:monospace;font-size:14px;font-weight:600;color:#14162b">${formatMoney(
+    order.amountTotal / 100
+  )}</td></tr>`;
+
   const expires = new Date(order.expiresAt).toLocaleDateString("en-IE", {
     day: "numeric",
     month: "long",
@@ -23,11 +31,12 @@ function receiptHtml(order: Order, baseUrl: string): string {
 <p style="margin:0 0 16px">Hi!</p>
 <p style="margin:0 0 16px">Thank you — truly!</p>
 <p style="margin:0 0 24px">You did something incredible out there, and it means a lot that you&rsquo;d let me be the one to capture it. Your photos are below, yours to keep forever. You earned it.</p>
-<table style="width:100%;border-collapse:collapse;margin:0 0 8px">${links}</table>
+<table style="width:100%;border-collapse:collapse;margin:0 0 20px">${links}${totalRow}</table>
 <p style="color:#5b5f73;font-size:13px;margin:0 0 24px">Full resolution, no watermark. These links work until <strong>${expires}</strong> &mdash; please save the files somewhere safe before then.</p>
 <p style="margin:0 0 16px">Every purchase helps me chase a dream of my own, so thank you for being part of that.</p>
 <p style="margin:0 0 16px">Tag me on Instagram <a href="https://www.instagram.com/helenkivimurd.photography" style="color:#2e4bff">@helenkivimurd.photography</a> or Facebook <a href="https://www.facebook.com/share/19NneShmVo/" style="color:#2e4bff">Helenkivimurd.photography</a> if you share them &mdash; I&rsquo;d love to see it!</p>
-<p style="margin:0 0 32px">When sharing publicly, please credit photo: Helen Kivimurd (unless agreed otherwise).</p>
+<p style="margin:0 0 24px">When sharing publicly, please credit photo: Helen Kivimurd (unless agreed otherwise).</p>
+<p style="margin:0 0 32px">Best,<br>Helen Kivimurd</p>
 <p style="color:#5b5f73;font-size:12px;margin:0;border-top:1px solid #edeef2;padding-top:16px">${formatMoney(order.amountTotal / 100)} for ${order.photoIds.length} photo${order.photoIds.length === 1 ? "" : "s"} &middot; Helen Kivimurd Photography</p>
 </div>`;
 }
