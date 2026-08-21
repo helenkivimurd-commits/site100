@@ -21,8 +21,10 @@ kivimurd.ee, www.kivimurd.ee {
 		Referrer-Policy "strict-origin-when-cross-origin"
 	}
 
-	# Purchased files are large; give slow phone connections room.
-	timeouts {
-		read_body 10m
-	}
+	# No body-size or read-timeout directive here on purpose. `timeouts` was
+	# Caddy 1 syntax and Caddy 2 refuses to load a config containing it, so this
+	# block stopped the web server starting at all. Caddy 2's defaults suit this
+	# app anyway: it imposes no request body limit, so a 60MB photo upload gets
+	# through, and paid downloads are redirects to B2 rather than bytes proxied
+	# through Caddy, so slow phone connections never hold a connection open here.
 }
