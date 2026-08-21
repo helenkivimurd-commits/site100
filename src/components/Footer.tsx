@@ -51,7 +51,7 @@ export default function Footer() {
           <div className="flex flex-col gap-2">
             <span className="uppercase tracking-wide text-muted">Socials</span>
             <a
-              href="https://instagram.com/h_kivimurd"
+              href="https://www.instagram.com/helenkivimurd.photography"
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-2 transition-colors hover:text-blue"
@@ -61,10 +61,10 @@ export default function Footer() {
                 <circle cx="12" cy="12" r="4" stroke="currentColor" strokeWidth="1.6" />
                 <circle cx="17.2" cy="6.8" r="1.1" fill="currentColor" />
               </svg>
-              @h_kivimurd
+              @helenkivimurd.photography
             </a>
             <a
-              href="https://www.facebook.com/helenliiskivimurd/"
+              href="https://www.facebook.com/share/19NneShmVo/"
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-2 transition-colors hover:text-blue"
@@ -77,7 +77,7 @@ export default function Footer() {
                   strokeLinejoin="round"
                 />
               </svg>
-              Helen Liis Kivimurd
+              Helen Kivimurd Photography
             </a>
           </div>
         </div>
