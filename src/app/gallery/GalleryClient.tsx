@@ -14,10 +14,18 @@ export default function GalleryClient({
   const [bib, setBib] = useState(initialBib);
   const [discipline, setDiscipline] = useState<string>("All");
   const [day, setDay] = useState<string>("All days");
+  const [event, setEvent] = useState<string>("All events");
 
   const disciplines = useMemo(() => {
     const set = new Set(photos.map((p) => p.discipline));
     return ["All", ...Array.from(set)];
+  }, [photos]);
+
+  // Only worth showing once she has shot more than one race; before that the
+  // row would be a single chip that filters nothing.
+  const events = useMemo(() => {
+    const set = new Set(photos.map((p) => p.event).filter(Boolean));
+    return ["All events", ...Array.from(set).sort()];
   }, [photos]);
 
   const days = useMemo(() => {
@@ -38,9 +46,10 @@ export default function GalleryClient({
       const matchesBib = q ? p.bibs.some((b) => b.toUpperCase().includes(q)) : true;
       const matchesDiscipline = discipline === "All" || p.discipline === discipline;
       const matchesDay = day === "All days" || p.day === day;
-      return matchesBib && matchesDiscipline && matchesDay;
+      const matchesEvent = event === "All events" || p.event === event;
+      return matchesBib && matchesDiscipline && matchesDay && matchesEvent;
     });
-  }, [photos, bib, discipline, day]);
+  }, [photos, bib, discipline, day, event]);
 
   return (
     <div>
@@ -78,6 +87,21 @@ export default function GalleryClient({
             )}
           </div>
         </div>
+        {events.length > 2 && (
+          <div className="mx-auto flex max-w-7xl flex-wrap gap-2 px-5 pb-3 sm:px-8">
+            {events.map((e) => (
+              <button
+                key={e}
+                onClick={() => setEvent(e)}
+                className={`rounded-full px-3.5 py-1.5 font-mono text-xs uppercase tracking-wide transition-colors ${
+                  event === e ? "bg-ink text-white" : "bg-card text-muted hover:text-ink"
+                }`}
+              >
+                {e}
+              </button>
+            ))}
+          </div>
+        )}
         {days.length > 2 && (
           <div className="mx-auto flex max-w-7xl flex-wrap gap-2 px-5 pb-3 sm:px-8">
             {days.map((d) => (

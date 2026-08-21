@@ -9,6 +9,7 @@ type Row = {
   id: string;
   title: string;
   day: string;
+  event: string;
   discipline: Discipline;
   bibsText: string;
   noBib: boolean;
@@ -35,6 +36,7 @@ function toRow(p: RowSource): Row {
     id: p.id,
     title: p.title,
     day: p.day,
+    event: p.event ?? FALLBACK_EVENT,
     discipline: p.discipline,
     bibsText: p.bibs.join(", "),
     noBib: p.reviewed && p.bibs.length === 0,
@@ -57,6 +59,16 @@ export default function AdminPage() {
   // keeps a photo on screen after you tag it, so the list doesn't reshuffle
   // under you mid-pass. Re-picking the filter takes a fresh snapshot.
   const [unreviewedSnapshot, setUnreviewedSnapshot] = useState<Set<string>>(new Set());
+
+  // Tagging is per-photo, but day, event and discipline are almost always the
+  // same across a whole race. Editing 268 of them one at a time is not work
+  // anybody should do by hand.
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkDay, setBulkDay] = useState("");
+  const [bulkEvent, setBulkEvent] = useState("");
+  const [bulkDiscipline, setBulkDiscipline] = useState<Discipline | "">("");
+  const [bulkBusy, setBulkBusy] = useState(false);
+  const [bulkStatus, setBulkStatus] = useState("");
 
   function showUnreviewed() {
     setUnreviewedSnapshot(new Set(rows.filter((r) => !r.reviewed).map((r) => r.id)));
@@ -213,6 +225,80 @@ function formatRaceDay(iso: string): string {
     save(id, { discipline });
   }
 
+  function toggleSelected(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  // Selects what is currently on screen rather than the whole library, so it
+  // respects the "Unreviewed only" filter — selecting a batch you cannot see
+  // would be a good way to change the wrong photos.
+  function toggleSelectAll() {
+    setSelected((prev) =>
+      prev.size === visible.length ? new Set() : new Set(visible.map((r) => r.id))
+    );
+  }
+
+  // Only the fields you actually filled in are sent, so setting a date does not
+  // silently overwrite the event on every selected photo.
+  async function applyBulk() {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+
+    const fields: { day?: string; event?: string; discipline?: Discipline } = {};
+    if (bulkDay) fields.day = formatRaceDay(bulkDay);
+    if (bulkEvent.trim()) fields.event = bulkEvent.trim();
+    if (bulkDiscipline) fields.discipline = bulkDiscipline;
+
+    if (Object.keys(fields).length === 0) {
+      setBulkStatus("Pick a date, event or discipline to apply first.");
+      return;
+    }
+
+    setBulkBusy(true);
+    let done = 0;
+    for (const id of ids) {
+      done += 1;
+      setBulkStatus(`Updating ${done} of ${ids.length}…`);
+      await fetch("/api/photos", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id, ...fields }),
+      });
+    }
+
+    setRows((prev) => prev.map((r) => (selected.has(r.id) ? { ...r, ...fields } : r)));
+    setBulkStatus(`Updated ${ids.length} photo${ids.length === 1 ? "" : "s"}.`);
+    setBulkBusy(false);
+  }
+
+  async function deleteSelected() {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    if (
+      !window.confirm(
+        `Delete ${ids.length} photo${ids.length === 1 ? "" : "s"}? This removes the files and can't be undone.`
+      )
+    )
+      return;
+
+    setBulkBusy(true);
+    let done = 0;
+    for (const id of ids) {
+      done += 1;
+      setBulkStatus(`Deleting ${done} of ${ids.length}…`);
+      await fetch(`/api/photos?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+    }
+    setRows((prev) => prev.filter((r) => !selected.has(r.id)));
+    setSelected(new Set());
+    setBulkStatus(`Deleted ${ids.length} photo${ids.length === 1 ? "" : "s"}.`);
+    setBulkBusy(false);
+  }
+
   async function deletePhoto(id: string) {
     if (!window.confirm("Delete this photo? This removes the files and can't be undone.")) return;
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, deleting: true } : r)));
@@ -313,7 +399,15 @@ function formatRaceDay(iso: string): string {
             </span>
           )}
         </span>
-        <div className="flex shrink-0 gap-2">
+        <div className="flex shrink-0 items-center gap-2">
+          <label className="flex cursor-pointer items-center gap-1.5 rounded-full border border-ink/15 px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-muted">
+            <input
+              type="checkbox"
+              checked={visible.length > 0 && selected.size === visible.length}
+              onChange={toggleSelectAll}
+            />
+            Select all
+          </label>
           <button
             onClick={() => setFilter("all")}
             className={`rounded-full border px-3 py-1.5 font-mono text-xs uppercase tracking-wide ${
@@ -333,6 +427,81 @@ function formatRaceDay(iso: string): string {
         </div>
       </div>
 
+      {selected.size > 0 && (
+        <div className="sticky top-[73px] z-20 mt-4 rounded-md border border-blue bg-page p-4 shadow-sm sm:top-[81px]">
+          <div className="flex flex-wrap items-end gap-3">
+            <p className="font-mono text-xs uppercase tracking-wide text-blue">
+              {selected.size} selected
+            </p>
+            <div className="flex flex-col gap-1">
+              <label className="font-mono text-[11px] uppercase tracking-wide text-muted">Day</label>
+              <input
+                type="date"
+                value={bulkDay}
+                onChange={(e) => setBulkDay(e.target.value)}
+                className="rounded-md border border-ink/15 bg-page px-2 py-1.5 text-sm outline-none focus:border-blue"
+              />
+            </div>
+            <div className="flex min-w-48 flex-1 flex-col gap-1">
+              <label className="font-mono text-[11px] uppercase tracking-wide text-muted">Event</label>
+              <input
+                value={bulkEvent}
+                onChange={(e) => setBulkEvent(e.target.value)}
+                placeholder="Leave blank to keep"
+                className="rounded-md border border-ink/15 bg-page px-2 py-1.5 text-sm outline-none focus:border-blue"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="font-mono text-[11px] uppercase tracking-wide text-muted">
+                Discipline
+              </label>
+              <select
+                value={bulkDiscipline}
+                onChange={(e) => setBulkDiscipline(e.target.value as Discipline | "")}
+                className="rounded-md border border-ink/15 bg-page px-2 py-1.5 text-sm outline-none focus:border-blue"
+              >
+                <option value="">Keep</option>
+                {DISCIPLINES.map((d) => (
+                  <option key={d} value={d}>
+                    {d}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              type="button"
+              onClick={applyBulk}
+              disabled={bulkBusy}
+              className="rounded-full bg-blue px-5 py-2 font-mono text-xs uppercase tracking-wide text-white transition-colors hover:bg-blue-hover disabled:opacity-50"
+            >
+              Apply
+            </button>
+            <button
+              type="button"
+              onClick={() => setSelected(new Set())}
+              disabled={bulkBusy}
+              className="font-mono text-xs uppercase tracking-wide text-muted hover:text-ink disabled:opacity-50"
+            >
+              Clear
+            </button>
+            <button
+              type="button"
+              onClick={deleteSelected}
+              disabled={bulkBusy}
+              className="ml-auto font-mono text-xs uppercase tracking-wide text-muted transition-colors hover:text-magenta disabled:opacity-50"
+            >
+              Delete selected
+            </button>
+          </div>
+          {/* Shows what customers will read, the same as the upload form does. */}
+          {(bulkDay || bulkStatus) && (
+            <p className="mt-3 font-mono text-xs text-muted">
+              {bulkStatus || `Day becomes: ${formatRaceDay(bulkDay)}`}
+            </p>
+          )}
+        </div>
+      )}
+
       {loading && (
         <p className="py-10 text-center font-mono text-sm text-muted">Loading photos…</p>
       )}
@@ -347,6 +516,13 @@ function formatRaceDay(iso: string): string {
               filter === "unreviewed" && row.reviewed ? "opacity-45" : ""
             }`}
           >
+            <input
+              type="checkbox"
+              checked={selected.has(row.id)}
+              onChange={() => toggleSelected(row.id)}
+              aria-label={`Select ${row.title}`}
+              className="shrink-0"
+            />
             <button
               type="button"
               onClick={() => setInspecting(i)}
