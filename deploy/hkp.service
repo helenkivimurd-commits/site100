@@ -27,8 +27,11 @@ NoNewPrivileges=true
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
-# The app writes uploads, order records and processed images under here.
-ReadWritePaths=/srv/hkp/site /srv/hkp/Media
+# The app writes order records and the watermarked previews under here. There
+# is deliberately no Media path any more: full-resolution originals live in the
+# B2 bucket, not on this disk. Listing a directory that does not exist makes
+# systemd refuse to start the unit at all (status=226/NAMESPACE).
+ReadWritePaths=/srv/hkp/site
 
 [Install]
 WantedBy=multi-user.target
