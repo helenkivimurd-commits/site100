@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
 import { getOrderBySession, markPaid, downloadUrl } from "@/lib/orders";
-import { getPhoto } from "@/lib/catalog";
+import { getPhotoMap } from "@/lib/catalog";
 
 // Powers the success page. It asks Stripe directly rather than waiting for the
 // webhook, so download links appear the instant the customer lands here even
@@ -37,6 +37,8 @@ export async function GET(request: Request) {
   }
 
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL ?? "http://localhost:3000";
+  // Read once for the whole order rather than per photo id.
+  const catalogue = await getPhotoMap();
 
   return NextResponse.json(
     {
@@ -44,7 +46,7 @@ export async function GET(request: Request) {
       amountTotal: order.amountTotal,
       expiresAt: order.expiresAt,
       photos: order.photoIds.map((id) => {
-        const photo = getPhoto(id);
+        const photo = catalogue.get(id);
         return {
           id,
           // Included so the success and downloads pages can name a photo the

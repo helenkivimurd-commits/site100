@@ -5,15 +5,11 @@ import type { StoredPhoto } from "@/lib/types";
 import { processUploadedPhoto, slugifyFilename } from "@/lib/serverImage";
 import { putOriginal } from "@/lib/originals";
 import { guardAdminRoute } from "@/lib/adminAuth";
+import { PREVIEW_DIR, THUMB_DIR, readCatalogue, writeCatalogue } from "@/lib/storage";
 
-const DATA_FILE = path.join(process.cwd(), "src", "data", "photos.json");
-// Only ever written to at runtime, never read at build time. Because these
-// resolve statically to a subfolder, output file tracing pulls both folders
-// wholesale into this route's .nft.json (~6.4 MB of JPEGs the server never
-// needs); `outputFileTracingExcludes` in next.config.ts keeps them out. POST
-// mkdir -p's both before writing, so an empty public/ on the server is fine.
-const PREVIEW_DIR = path.join(process.cwd(), "public", "photos", "preview");
-const THUMB_DIR = path.join(process.cwd(), "public", "photos", "thumb");
+// Where the catalogue and the renders live is storage.ts's decision — on the
+// server, deliberately outside the git working tree. POST mkdir -p's the render
+// directories before writing, so a fresh server with neither is fine.
 
 // Generous for a camera JPEG, small enough that a handful in flight can't
 // exhaust memory — each upload is buffered whole before sharp sees it.
@@ -54,14 +50,11 @@ function withQueue<T>(fn: () => Promise<T>): Promise<T> {
   return result;
 }
 
-async function readData(): Promise<Record<string, StoredPhoto>> {
-  const raw = await fs.readFile(DATA_FILE, "utf-8");
-  return JSON.parse(raw);
-}
-
-async function writeData(data: Record<string, StoredPhoto>) {
-  await fs.writeFile(DATA_FILE, JSON.stringify(data, null, 2) + "\n");
-}
+// Both go through storage.ts: reads always hit the disk so a read-modify-write
+// starts from the real file, and writes land atomically so an interrupted one
+// cannot truncate the catalogue.
+const readData = readCatalogue;
+const writeData = writeCatalogue;
 
 // Every handler in this file is admin-only. src/proxy.ts already turns away
 // unauthenticated requests to /api/photos; guardAdminRoute repeats the check

@@ -2,7 +2,7 @@ import Image from "next/image";
 import Link from "next/link";
 import BibSearch from "@/components/BibSearch";
 import PhotoGrid from "@/components/PhotoGrid";
-import { photos } from "@/lib/catalog";
+import { getPhotos } from "@/lib/catalog";
 import { formatMoney } from "@/lib/money";
 import {
   SINGLE_PRICE,
@@ -10,8 +10,6 @@ import {
   pricePerPhotoAt,
   bundleTotalAt,
 } from "@/lib/pricing";
-
-const previewPhotos = photos.slice(0, 8);
 
 // Prices come from src/lib/pricing.ts — change the numbers there and this
 // section (and the actual basket math) updates everywhere automatically.
@@ -58,7 +56,12 @@ const steps = [
   },
 ];
 
-export default function Home() {
+// Reads the catalogue per request; see the note in gallery/page.tsx.
+export const dynamic = "force-dynamic";
+
+export default async function Home() {
+  const photos = await getPhotos();
+  const previewPhotos = photos.slice(0, 8);
   return (
     <>
       {/* "Find my bib" targets the top of the hero, not the bib card lower down.

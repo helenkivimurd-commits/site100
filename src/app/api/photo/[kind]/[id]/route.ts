@@ -1,18 +1,19 @@
 import { NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
 import path from "node:path";
+import { PREVIEW_DIR, THUMB_DIR } from "@/lib/storage";
 
-// Watermarked previews and thumbnails are written at upload time into
-// public/photos/. That works in dev, but `next start` only serves the files
-// public/ contained when the site was BUILT — anything written afterwards is a
-// 404. On a live server that means every photo uploaded after deployment shows
-// a broken image until someone rebuilds, which is not a workable shop.
+// Watermarked previews and thumbnails are written at upload time and read back
+// through this handler rather than served as static files. `next start` only
+// serves what public/ held when the site was BUILT, so anything written
+// afterwards would 404 until someone rebuilt — not a workable shop. Handlers
+// run per request and read from disk as it is now.
 //
-// Reading them through a route handler instead sidesteps that: handlers run per
-// request and read from disk as it is now, not as it was at build time.
+// Where the files actually live is storage.ts's decision; on the server it is
+// outside the git working tree so that a stray `git clean` cannot delete them.
 const ROOTS = {
-  thumb: path.join(process.cwd(), "public", "photos", "thumb"),
-  preview: path.join(process.cwd(), "public", "photos", "preview"),
+  thumb: THUMB_DIR,
+  preview: PREVIEW_DIR,
 } as const;
 
 type Kind = keyof typeof ROOTS;

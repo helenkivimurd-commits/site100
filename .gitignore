@@ -14,6 +14,13 @@ build/
 # Order records and download tokens (generated at runtime)
 .data/
 
+# Runtime photo data. On the server these live outside the repo entirely (see
+# CATALOGUE_FILE / RENDERS_DIR in src/lib/storage.ts); locally they land here.
+# Ignored rather than merely untracked so that `git clean -fd` skips them too.
+/public/photos/preview/
+/public/photos/thumb/
+/src/data/photos.json
+
 *.tsbuildinfo
 next-env.d.ts
 

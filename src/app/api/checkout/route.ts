@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getStripe } from "@/lib/stripe";
-import { getPhoto } from "@/lib/catalog";
+import { getPhotoMap } from "@/lib/catalog";
 import type { Photo } from "@/lib/types";
 import { pricePerPhotoAt } from "@/lib/pricing";
 import { createPendingOrder } from "@/lib/orders";
@@ -51,8 +51,9 @@ export async function POST(request: Request) {
   // customer is charged.
   const photos: Photo[] = [];
   const missing: string[] = [];
+  const catalogue = await getPhotoMap();
   for (const id of photoIds) {
-    const photo = getPhoto(id);
+    const photo = catalogue.get(id);
     if (photo) photos.push(photo);
     else missing.push(id);
   }
