@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import PhotoGrid from "@/components/PhotoGrid";
 import type { Photo } from "@/lib/types";
+import { matchBibs, comparePartials } from "@/lib/bibMatch";
 
 export default function GalleryClient({
   photos,
@@ -40,15 +41,37 @@ export default function GalleryClient({
     return ["All days", ...sorted];
   }, [photos]);
 
-  const results = useMemo(() => {
-    const q = bib.trim().toUpperCase();
-    return photos.filter((p) => {
-      const matchesBib = q ? p.bibs.some((b) => b.toUpperCase().includes(q)) : true;
-      const matchesDiscipline = discipline === "All" || p.discipline === discipline;
-      const matchesDay = day === "All days" || p.day === day;
-      const matchesEvent = event === "All events" || p.event === event;
-      return matchesBib && matchesDiscipline && matchesDay && matchesEvent;
-    });
+  // Split into two lists rather than one. `results` is what we are confident
+  // about; `maybes` are photos whose bib was only partly readable when it was
+  // tagged, so the number written on them is a piece of what the buyer typed.
+  // Those are shown apart and clearly hedged — a runner must never be nudged
+  // into buying a photo of somebody else.
+  const { results, maybes } = useMemo(() => {
+    const q = bib.trim();
+    const confident: Photo[] = [];
+    const partial: { photo: Photo; visible: number; contiguous: boolean }[] = [];
+
+    for (const p of photos) {
+      if (discipline !== "All" && p.discipline !== discipline) continue;
+      if (day !== "All days" && p.day !== day) continue;
+      if (event !== "All events" && p.event !== event) continue;
+
+      if (!q) {
+        confident.push(p);
+        continue;
+      }
+
+      const match = matchBibs(q, p.bibs);
+      if (!match) continue;
+      if (match.kind === "partial") {
+        partial.push({ photo: p, visible: match.visible, contiguous: match.contiguous });
+      } else {
+        confident.push(p);
+      }
+    }
+
+    partial.sort(comparePartials);
+    return { results: confident, maybes: partial.map((m) => m.photo) };
   }, [photos, bib, discipline, day, event]);
 
   return (
@@ -139,7 +162,12 @@ export default function GalleryClient({
 
       <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8">
         {results.length > 0 ? (
-          <PhotoGrid photos={results} />
+          <>
+            <PhotoGrid photos={results} />
+            {maybes.length > 0 && <MaybeSection photos={maybes} bib={bib} />}
+          </>
+        ) : maybes.length > 0 ? (
+          <MaybeSection photos={maybes} bib={bib} soleResult />
         ) : (
           <div className="flex flex-col items-center gap-3 py-24 text-center">
             <p className="font-display text-3xl uppercase tracking-wide text-muted">
@@ -162,5 +190,36 @@ export default function GalleryClient({
         )}
       </div>
     </div>
+  );
+}
+
+// Photos whose bib was only partly legible when it was tagged. Presented as a
+// question rather than an answer: the heading says "might", the explanation
+// says why, and it sits below the confident results so it never looks like the
+// main answer to the search.
+function MaybeSection({
+  photos,
+  bib,
+  soleResult = false,
+}: {
+  photos: Photo[];
+  bib: string;
+  soleResult?: boolean;
+}) {
+  return (
+    <section className={soleResult ? "" : "mt-16 border-t border-card pt-10"}>
+      <h2 className="font-display text-2xl uppercase tracking-wide sm:text-3xl">
+        {soleResult ? "These might be you" : "More that might be you"}
+      </h2>
+      <p className="mt-2 max-w-xl text-sm text-muted">
+        {photos.length} photo{photos.length === 1 ? "" : "s"} where only part of the bib could be
+        read &mdash; an arm or another runner was in the way &mdash; and what could be read fits{" "}
+        <span className="font-mono text-ink">{bib}</span>. Check them before buying: the rest of
+        the number is hidden, so some of these will be other runners.
+      </p>
+      <div className="mt-6">
+        <PhotoGrid photos={photos} />
+      </div>
+    </section>
   );
 }
