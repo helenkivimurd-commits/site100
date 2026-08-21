@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { DISCIPLINES, type Discipline } from "@/lib/types";
 
 export type InspectorPhoto = {
   id: string;
   title: string;
   bibsText: string;
   noBib: boolean;
+  discipline: Discipline;
+  deleting: boolean;
 };
 
 export default function PhotoInspector({
@@ -18,6 +21,8 @@ export default function PhotoInspector({
   onNext,
   onChangeBibs,
   onSave,
+  onChangeDiscipline,
+  onDelete,
 }: {
   photo: InspectorPhoto;
   position: number;
@@ -27,6 +32,8 @@ export default function PhotoInspector({
   onNext?: () => void;
   onChangeBibs: (bibsText: string) => void;
   onSave: (bibsText: string, noBib: boolean) => void;
+  onChangeDiscipline: (discipline: Discipline) => void;
+  onDelete: () => void;
 }) {
   const [zoomed, setZoomed] = useState(false);
   const [origin, setOrigin] = useState("50% 50%");
@@ -117,8 +124,8 @@ export default function PhotoInspector({
         )}
         {failed && (
           <p className="absolute max-w-sm px-6 text-center font-mono text-xs text-white/70">
-            Couldn&apos;t load the original for this photo — it may have been moved out of the
-            Media folder. Showing nothing rather than a watermarked copy.
+            Couldn&apos;t load the original for this photo — it may be missing from the photo
+            bucket. Showing nothing rather than a watermarked copy.
           </p>
         )}
 
@@ -182,9 +189,37 @@ export default function PhotoInspector({
         >
           Save &amp; next
         </button>
+
+        {/* Discipline belongs here as much as the bib does: looking at the photo
+            full size is when you can tell the bike leg from the run. */}
+        <label className="font-mono text-xs uppercase tracking-wide text-white/60">
+          Discipline
+        </label>
+        <select
+          value={photo.discipline}
+          onChange={(e) => onChangeDiscipline(e.target.value as Discipline)}
+          className="rounded-md border border-white/25 bg-white/10 px-3 py-2 font-mono text-sm text-white outline-none focus:border-white"
+        >
+          {DISCIPLINES.map((d) => (
+            <option key={d} value={d} className="text-ink">
+              {d}
+            </option>
+          ))}
+        </select>
+
         <span className="font-mono text-xs text-white/40">
           Enter saves · ← → moves · Esc closes
         </span>
+
+        {/* Full size is also when you decide a frame is not worth selling, so
+            the cull happens here rather than back in the list. */}
+        <button
+          onClick={onDelete}
+          disabled={photo.deleting}
+          className="ml-auto rounded-full border border-white/25 px-4 py-2 font-mono text-xs uppercase tracking-wide text-white/70 transition-colors hover:border-magenta hover:text-magenta disabled:opacity-40"
+        >
+          {photo.deleting ? "Deleting…" : "Delete photo"}
+        </button>
       </div>
     </div>
   );

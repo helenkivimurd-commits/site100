@@ -613,6 +613,11 @@ function formatRaceDay(iso: string): string {
           }
           onChangeBibs={(text) => updateBibsText(visible[inspecting].id, text)}
           onSave={(text, noBib) => saveBibs(visible[inspecting].id, text, noBib)}
+          onChangeDiscipline={(d) => updateDiscipline(visible[inspecting].id, d)}
+          // The index is deliberately left alone: removing this row shifts the
+          // next photo into the same slot, so a cull run keeps moving forward
+          // rather than dropping you back to the list after every delete.
+          onDelete={() => deletePhoto(visible[inspecting].id)}
         />
       )}
     </div>
