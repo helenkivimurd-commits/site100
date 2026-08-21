@@ -9,7 +9,8 @@ export const DISCIPLINES: Discipline[] = [
   "Crowd",
 ];
 
-// Shape stored in src/data/photos.json, keyed by photo id.
+// Shape stored in the catalogue (see CATALOGUE_FILE in src/lib/storage.ts),
+// keyed by photo id.
 export type StoredPhoto = {
   title: string;
   event: string;

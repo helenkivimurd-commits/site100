@@ -102,7 +102,7 @@ function formatRaceDay(iso: string): string {
   const [inspecting, setInspecting] = useState<number | null>(null);
 
   // Loaded over HTTP rather than imported, so editing a photo doesn't pull
-  // src/data/photos.json into this page's bundle (see the GET handler's note).
+  // the catalogue into this page's bundle (see the GET handler's note).
   useEffect(() => {
     let cancelled = false;
     (async () => {

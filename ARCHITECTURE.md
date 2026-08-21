@@ -67,7 +67,7 @@ Tags each photo in /admin        clicks a thumbnail, reads the bib number
    │                             off the full-size original, types it in
    │                             src/app/admin/PhotoInspector.tsx
    ▼
-PATCH /api/photos                saves to src/data/photos.json
+PATCH /api/photos                saves to the catalogue (see CATALOGUE_FILE)
    ▼
 Photo is now findable by bib
 ```
@@ -165,7 +165,8 @@ The whole admin area sits behind a password (`src/proxy.ts`).
 | File | Purpose |
 |---|---|
 | `src/lib/types.ts` | The shape of a photo, the six disciplines, the cart item type |
-| `src/lib/catalog.ts` | Loads `photos.json` and provides `getPhoto`, `searchByBib` |
+| `src/lib/catalog.ts` | Reads the catalogue per request and provides `getPhotos`, `getPhoto`, `getPhotoMap` |
+| `src/lib/storage.ts` | **Owns where live data lives.** `CATALOGUE_FILE` / `RENDERS_DIR`, and the atomic catalogue write |
 | `src/lib/pricing.ts` | **All prices live here.** €5 each, 20% off at 5+, 40% off at 10+ |
 | `src/lib/money.ts` | Formats numbers as euros |
 | `src/lib/serverImage.ts` | Resizes and watermarks an uploaded photo; turns filenames into ids |
@@ -180,10 +181,10 @@ The whole admin area sits behind a password (`src/proxy.ts`).
 
 | Path | Purpose |
 |---|---|
-| `src/data/photos.json` | **The catalogue.** Every photo's title, event, day, discipline, size and bib numbers. Order in this file = display order |
+| `$CATALOGUE_FILE` | **The catalogue.** Every photo's title, event, day, discipline, size and bib numbers. Order in this file = display order. Defaults to `src/data/photos.json`; on the server it is `/srv/hkp/data/photos.json`, outside the git tree |
 | `.data/orders.json` | Orders and download tokens. Created automatically, gitignored |
-| `public/photos/thumb/` | 900px watermarked — grid tiles |
-| `public/photos/preview/` | 1600px watermarked — the lightbox |
+| `$RENDERS_DIR/thumb/` | 900px watermarked — grid tiles. Server: `/srv/hkp/renders/thumb` |
+| `$RENDERS_DIR/preview/` | 1600px watermarked — the lightbox. Server: `/srv/hkp/renders/preview` |
 | `public/photos/hero/` | 2560px **unwatermarked** — homepage banner only |
 | `public/images/` | Logo (ink and white) and the photographer portrait |
 | B2 bucket, `originals/` | **Off this server entirely.** The untouched originals, keyed `<photo-id>.<ext>`. Reachable only through `src/lib/originals.ts` |
@@ -202,7 +203,7 @@ The whole admin area sits behind a password (`src/proxy.ts`).
 
 | Data | Where | Survives a restart? |
 |---|---|---|
-| Photo catalogue | `src/data/photos.json` | Yes |
+| Photo catalogue | `$CATALOGUE_FILE` (server: `/srv/hkp/data/photos.json`) | Yes |
 | Orders and tokens | `.data/orders.json` | Yes |
 | The basket | Browser `localStorage`, key `hkp-basket` | Yes, per browser |
 | Past purchases | Browser `localStorage`, key `hkp-purchases` | Yes, per browser |

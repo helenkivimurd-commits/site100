@@ -152,7 +152,7 @@ to the bucket on their own.
 
 ## 9. Backups — do not skip this
 
-The B2 bucket, `src/data/photos.json` and `.data/orders.json` are the business.
+The B2 bucket, `/srv/hkp/data/photos.json` and `.data/orders.json` are the business.
 Losing the orders file means paying customers can no longer download.
 
 ```bash
@@ -160,7 +160,7 @@ cat > /etc/cron.daily/hkp-backup <<'SH'
 #!/bin/sh
 d=/srv/hkp/backups/$(date +%F)
 mkdir -p "$d"
-cp /srv/hkp/site/src/data/photos.json "$d/"
+cp /srv/hkp/data/photos.json "$d/"
 cp /srv/hkp/site/.data/orders.json "$d/" 2>/dev/null
 find /srv/hkp/backups -maxdepth 1 -type d -mtime +30 -exec rm -rf {} +
 SH
@@ -184,6 +184,25 @@ git add -A && git commit -m "what changed" && git push
 # on the server
 cd /srv/hkp/site && git pull && npm ci && npm run build
 systemctl restart hkp
+```
+
+
+**Do not deploy while photos are uploading.** The last step restarts the app,
+and an upload in progress is writing the catalogue; a restart mid-upload loses
+that photo, and before the write was made atomic could have truncated the whole
+catalogue. Let the upload finish first. A few thousand photos take a few hours,
+since the admin uploads them one at a time.
+
+**Live data is not in this directory.** The catalogue is `/srv/hkp/data/photos.json`
+and the renders are under `/srv/hkp/renders/`, both deliberately outside the git
+working tree — `git clean -fd` in `/srv/hkp/site` once deleted every render, and
+`git reset --hard` would reset a catalogue kept in the repo to empty. Nothing in
+`/srv/hkp/site` needs preserving across a deploy except `.env.local`.
+
+If the renders are ever lost again, they rebuild from the B2 originals:
+
+```
+cd /srv/hkp/site && node --env-file=.env.local scripts/rebuild-renders.mjs
 ```
 
 There are a few seconds of downtime on restart. Fine at this scale.

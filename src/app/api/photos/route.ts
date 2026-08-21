@@ -61,7 +61,7 @@ const writeData = writeCatalogue;
 // here so these handlers stay closed if that matcher is ever narrowed.
 
 // The admin page reads the library through this rather than importing
-// src/data/photos.json. That keeps the file out of the admin route's module
+// the catalogue directly. That keeps the file out of the admin route's module
 // graph, so saving an edit doesn't make the dev server rebuild and reload the
 // page out from under you mid-tagging.
 export async function GET(request: Request) {
