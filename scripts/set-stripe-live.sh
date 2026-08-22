@@ -24,7 +24,7 @@ fail() { printf '\033[31m%s\033[0m\n' "$1" >&2; exit 1; }
 bold "Switching h_kivimurd Photography to LIVE Stripe keys"
 echo
 echo "You need two values from the Stripe dashboard, both with test mode OFF:"
-echo "  1. the live secret key       — starts with sk_live_"
+echo "  1. the live secret key       — starts with rk_live_ (restricted) or sk_live_"
 echo "  2. the live signing secret   — starts with whsec_"
 echo
 echo "Nothing appears on screen while you paste. That is normal — keep going"
@@ -40,12 +40,17 @@ echo
 echo
 
 # Checked here rather than on the server, so a wrong paste never leaves this Mac.
+# rk_live_ is a restricted key, which is what this site should normally use:
+# it only needs Checkout Sessions write, and the Stripe account is a shared
+# company one, so a full-access key on this server would be over-privileged.
+# sk_live_ is accepted too.
 case "$SECRET_KEY" in
-  sk_live_*) ;;
-  sk_test_*) fail "That is a TEST key (sk_test_). Turn test mode OFF in Stripe and copy the live one." ;;
-  pk_*)      fail "That is the publishable key (pk_). This site needs the SECRET key (sk_live_)." ;;
+  rk_live_*) KEY_KIND="restricted live key" ;;
+  sk_live_*) KEY_KIND="standard live key" ;;
+  rk_test_*|sk_test_*) fail "That is a TEST key. Turn test mode OFF in Stripe and copy the live one." ;;
+  pk_*)      fail "That is the publishable key (pk_). This site needs the secret key (sk_live_ or rk_live_)." ;;
   "")        fail "Nothing was pasted for the secret key." ;;
-  *)         fail "That does not look like a Stripe secret key — it should start with sk_live_." ;;
+  *)         fail "That does not look like a Stripe secret key — it should start with rk_live_ or sk_live_." ;;
 esac
 
 case "$WEBHOOK_SECRET" in
@@ -55,7 +60,7 @@ case "$WEBHOOK_SECRET" in
   *)       fail "That does not look like a signing secret — it should start with whsec_." ;;
 esac
 
-echo "Both values look right. Updating the server..."
+echo "Both values look right ($KEY_KIND). Updating the server..."
 echo
 
 # The two secrets travel on stdin. The command line below holds only code, so
@@ -103,7 +108,7 @@ print(\"  .env.local updated, backup saved as \" + os.path.basename(backup))
 systemctl restart hkp
 sleep 5
 printf "  service: "; systemctl is-active hkp
-printf "  mode now: "; grep -o "^STRIPE_SECRET_KEY=sk_[a-z]*" '"$ENVFILE"' | sed "s/.*sk_//"
+printf "  mode now: "; grep -oE "^STRIPE_SECRET_KEY=(sk|rk)_[a-z]*" '"$ENVFILE"' | sed "s/.*_//"
 '
 
 echo
