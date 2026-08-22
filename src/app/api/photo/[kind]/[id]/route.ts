@@ -18,11 +18,23 @@ const ROOTS = {
 
 type Kind = keyof typeof ROOTS;
 
+// These were served as `immutable` for a year, on the reasoning that a photo id
+// never changes what it points at. Re-watermarking the whole catalogue broke
+// that: every render was rewritten under its existing id, and browsers and
+// Next's image optimiser both went on serving the old picture — the gallery
+// showed the previous watermark while the file on disk had the new one.
+//
+// An hour of free reuse keeps repeat visits cheap; after that a cached copy is
+// still shown instantly while being revalidated in the background, and the
+// ETag makes that revalidation a 304 with no image body. A change to a render
+// now reaches everyone on its own, without anyone clearing a cache.
+const CACHE_CONTROL = "public, max-age=3600, stale-while-revalidate=2592000";
+
 // These are watermarked, deliberately public images — the same ones the gallery
 // shows — so there is no access check here. The originals are the guarded
 // thing, and they live in object storage behind /api/download.
 export async function GET(
-  _request: Request,
+  request: Request,
   { params }: { params: Promise<{ kind: string; id: string }> }
 ) {
   const { kind, id } = await params;
@@ -36,14 +48,27 @@ export async function GET(
     return NextResponse.json({ error: "Bad image id." }, { status: 400 });
   }
 
+  const file = path.join(ROOTS[kind as Kind], `${id}.jpg`);
+
   try {
-    const file = await fs.readFile(path.join(ROOTS[kind as Kind], `${id}.jpg`));
-    return new NextResponse(new Uint8Array(file), {
+    // The render's own mtime and size are the version. Re-watermarking rewrites
+    // every file in place under the same id, so identity alone cannot say
+    // whether a cached copy is still current — this can.
+    const stat = await fs.stat(file);
+    const etag = `"${stat.mtimeMs.toString(36)}-${stat.size.toString(36)}"`;
+
+    // A caller holding the current version gets a 304 and no body at all.
+    if (request.headers.get("if-none-match") === etag) {
+      return new NextResponse(null, { status: 304, headers: { ETag: etag, "Cache-Control": CACHE_CONTROL } });
+    }
+
+    const body = await fs.readFile(file);
+    return new NextResponse(new Uint8Array(body), {
       headers: {
         "Content-Type": "image/jpeg",
-        "Content-Length": String(file.length),
-        // Content for a given id never changes: a new upload gets a new id.
-        "Cache-Control": "public, max-age=31536000, immutable",
+        "Content-Length": String(body.length),
+        "Cache-Control": CACHE_CONTROL,
+        ETag: etag,
       },
     });
   } catch {
