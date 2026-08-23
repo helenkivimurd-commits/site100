@@ -1,0 +1,14 @@
+[Unit]
+Description=Scan newly uploaded photos for bib numbers every few minutes
+
+[Timer]
+# Five minutes after boot, then every five minutes. A scan of a few hundred
+# photos takes far longer than that; the lock file in bib-scan.mjs makes the
+# overlapping runs exit immediately rather than pile up.
+OnBootSec=5min
+OnUnitActiveSec=5min
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target

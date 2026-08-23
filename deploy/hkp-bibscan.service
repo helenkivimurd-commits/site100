@@ -1,0 +1,32 @@
+[Unit]
+Description=Read bib numbers off newly uploaded photos
+After=network-online.target hkp.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=hkp
+WorkingDirectory=/srv/hkp/site
+ExecStart=/usr/bin/node --env-file=.env.local scripts/bib-scan.mjs
+
+# This runs while the photographer may be uploading, and an upload she is
+# watching matters more than finishing the scan sooner. Both dials are set so
+# tesseract yields the CPU and the disk to the app whenever they compete.
+Nice=19
+IOSchedulingClass=idle
+
+# Same hardening as hkp.service. The scan writes only its own record of which
+# photos it has already looked at — the catalogue itself is written by the app,
+# through its PATCH endpoint, so that all writes to that file stay in one
+# process. Everything else on disk stays read-only to this unit.
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+ReadWritePaths=/srv/hkp/data
+
+# A scan that hangs must not block the next one indefinitely.
+TimeoutStartSec=6h
+
+[Install]
+WantedBy=multi-user.target

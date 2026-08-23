@@ -229,3 +229,31 @@ which is trivially reversed.
 - A refund policy page — Stripe asks for the URL
 - VAT: Stripe Tax is not switched on
 - No `charge.refunded` webhook, so refunds don't revoke download links
+
+## Reading bib numbers automatically
+
+`hkp-bibscan.timer` runs `scripts/bib-scan.mjs` every five minutes. It picks up
+photos that have no bib and have not been reviewed, reads the original out of
+the B2 bucket, and fills in a number when it is confident enough.
+
+Measured against 60 photos tagged by hand, at the thresholds in that script:
+**48% of photos get a correct bib, 7% get a wrong one, 47% are left blank.**
+So it removes about half the typing and never claims to do more.
+
+It will not overwrite a bib typed by hand, will not touch a reviewed photo, and
+never marks anything reviewed — every photo still has to be looked at. It saves
+through the app's own PATCH endpoint rather than writing the catalogue file, so
+its writes queue behind uploads instead of racing them.
+
+    systemctl status hkp-bibscan.timer      # is it running
+    journalctl -u hkp-bibscan -n 50         # what it has been doing
+    systemctl start hkp-bibscan.service     # scan now, do not wait
+
+To try a threshold change without saving anything:
+
+    cd /srv/hkp/site && DRY_RUN=1 node --env-file=.env.local scripts/bib-scan.mjs
+
+`/srv/hkp/data/ocr-seen.json` records which photos have already been looked at.
+Delete it to have everything scanned again. To turn the whole thing off:
+
+    systemctl disable --now hkp-bibscan.timer
