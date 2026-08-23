@@ -1,105 +1,110 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useMemo, useState, type FormEvent } from "react";
 import PhotoGrid from "@/components/PhotoGrid";
 import type { Photo } from "@/lib/types";
-import { matchBibs, comparePartials } from "@/lib/bibMatch";
+import type { BrowseView, Folder } from "@/lib/browse";
+import { splitByBib } from "@/lib/browse";
 
+// The gallery browses like folders: events, then the disciplines inside the
+// chosen one, then the photos. Which level is showing was decided on the
+// server; this renders it and handles the bib box.
+//
+// The bib box means two different things depending on where you are, which is
+// deliberate. At the top it searches the whole catalogue and jumps straight to
+// the results — somebody who knows their number should never have to work out
+// which event they were in first. Inside a folder it narrows that folder as you
+// type, because by then you have already said which photos you mean.
 export default function GalleryClient({
-  photos,
+  view,
   initialBib,
 }: {
-  photos: Photo[];
+  view: BrowseView;
   initialBib: string;
 }) {
+  const router = useRouter();
   const [bib, setBib] = useState(initialBib);
-  const [discipline, setDiscipline] = useState<string>("All");
-  const [day, setDay] = useState<string>("All days");
-  const [event, setEvent] = useState<string>("All events");
 
-  const disciplines = useMemo(() => {
-    const set = new Set(photos.map((p) => p.discipline));
-    return ["All", ...Array.from(set)];
-  }, [photos]);
+  const insideFolder = view.kind === "photos";
 
-  // Only worth showing once she has shot more than one race; before that the
-  // row would be a single chip that filters nothing.
-  const events = useMemo(() => {
-    const set = new Set(photos.map((p) => p.event).filter(Boolean));
-    return ["All events", ...Array.from(set).sort()];
-  }, [photos]);
+  // Inside a folder the filtering is instant, over photos the browser already
+  // holds. At the top level there is nothing here to filter — the whole
+  // catalogue is deliberately not sent — so submitting navigates instead and
+  // the server does the search.
+  const filtered = useMemo(() => {
+    if (view.kind === "search") return { photos: view.photos, maybes: view.maybes };
+    if (view.kind !== "photos") return { photos: [] as Photo[], maybes: [] as Photo[] };
+    if (!bib.trim()) return { photos: view.photos, maybes: [] as Photo[] };
+    return splitByBib(view.photos, bib.trim());
+  }, [view, bib]);
 
-  const days = useMemo(() => {
-    const set = new Set(photos.map((p) => p.day));
-    // Sort chronologically by the "Mon DD" part — the exact year doesn't matter
-    // since every photo in the catalog is from the same event window.
-    const sorted = Array.from(set).sort(
-      (a, b) =>
-        new Date(`${a.split(", ")[1]} 2024`).getTime() -
-        new Date(`${b.split(", ")[1]} 2024`).getTime()
-    );
-    return ["All days", ...sorted];
-  }, [photos]);
+  // Whichever event is currently open stays open when a bib is submitted, so
+  // searching from inside a race searches that race and not the whole shop.
+  const scopeEvent =
+    view.kind === "disciplines" || view.kind === "search" ? view.event : undefined;
 
-  // Split into two lists rather than one. `results` is what we are confident
-  // about; `maybes` are photos whose bib was only partly readable when it was
-  // tagged, so the number written on them is a piece of what the buyer typed.
-  // Those are shown apart and clearly hedged — a runner must never be nudged
-  // into buying a photo of somebody else.
-  const { results, maybes } = useMemo(() => {
+  function onSubmit(e: FormEvent) {
+    e.preventDefault();
+    if (insideFolder) return; // already filtering as she types
+    const params = new URLSearchParams();
+    if (scopeEvent) params.set("event", scopeEvent);
     const q = bib.trim();
-    const confident: Photo[] = [];
-    const partial: { photo: Photo; visible: number; contiguous: boolean }[] = [];
+    if (q) params.set("bib", q);
+    router.push(params.toString() ? `/gallery?${params}` : "/gallery");
+  }
 
-    for (const p of photos) {
-      if (discipline !== "All" && p.discipline !== discipline) continue;
-      if (day !== "All days" && p.day !== day) continue;
-      if (event !== "All events" && p.event !== event) continue;
+  function clearBib() {
+    setBib("");
+    if (view.kind !== "search") return;
+    router.push(view.event ? `/gallery?event=${encodeURIComponent(view.event)}` : "/gallery");
+  }
 
-      if (!q) {
-        confident.push(p);
-        continue;
-      }
-
-      const match = matchBibs(q, p.bibs);
-      if (!match) continue;
-      if (match.kind === "partial") {
-        partial.push({ photo: p, visible: match.visible, contiguous: match.contiguous });
-      } else {
-        confident.push(p);
-      }
-    }
-
-    partial.sort(comparePartials);
-    return { results: confident, maybes: partial.map((m) => m.photo) };
-  }, [photos, bib, discipline, day, event]);
+  const { title, subtitle } = heading(view, filtered.photos.length, bib);
 
   return (
     <div>
       <div className="sticky top-[73px] z-30 border-b border-card bg-page/95 backdrop-blur sm:top-[81px]">
         <div className="mx-auto flex max-w-7xl flex-col gap-4 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-8">
-          <div>
-            <h1 className="font-display text-3xl uppercase tracking-wide sm:text-4xl">
-              All photos
+          <div className="min-w-0">
+            <Breadcrumb view={view} />
+            <h1 className="truncate font-display text-3xl uppercase tracking-wide sm:text-4xl">
+              {title}
             </h1>
-            <p className="font-mono text-xs text-muted">
-              {results.length} photo{results.length === 1 ? "" : "s"}
-              {bib ? ` matching bib "${bib}"` : ""}
-            </p>
+            <p className="font-mono text-xs text-muted">{subtitle}</p>
           </div>
-          <div className="flex w-full max-w-md items-center gap-2 rounded-md border border-ink/15 bg-page px-3">
+
+          <form
+            onSubmit={onSubmit}
+            className="flex w-full max-w-md items-center gap-2 rounded-md border border-ink/15 bg-page px-3"
+          >
             <span className="font-mono text-sm text-muted">#</span>
             <input
               value={bib}
               onChange={(e) => setBib(e.target.value)}
               inputMode="numeric"
-              placeholder="Filter by bib number"
-              aria-label="Filter by bib number"
+              placeholder={
+                insideFolder
+                  ? "Filter these photos by bib"
+                  : scopeEvent
+                    ? `Search ${scopeEvent} by bib`
+                    : "Search every photo by bib"
+              }
+              aria-label={
+                insideFolder
+                  ? "Filter these photos by bib number"
+                  : scopeEvent
+                    ? `Search ${scopeEvent} by bib number`
+                    : "Search every photo by bib number"
+              }
               className="w-full bg-transparent py-2.5 font-mono text-sm text-ink outline-none placeholder:text-muted"
             />
-            {bib && (
+            {bib ? (
               <button
-                onClick={() => setBib("")}
+                type="button"
+                onClick={clearBib}
                 aria-label="Clear bib filter"
                 className="text-muted transition-colors hover:text-ink"
               >
@@ -107,88 +112,198 @@ export default function GalleryClient({
                   <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
                 </svg>
               </button>
-            )}
-          </div>
-        </div>
-        {events.length > 2 && (
-          <div className="mx-auto flex max-w-7xl flex-wrap gap-2 px-5 pb-3 sm:px-8">
-            {events.map((e) => (
-              <button
-                key={e}
-                onClick={() => setEvent(e)}
-                className={`rounded-full px-3.5 py-1.5 font-mono text-xs uppercase tracking-wide transition-colors ${
-                  event === e ? "bg-ink text-white" : "bg-card text-muted hover:text-ink"
-                }`}
-              >
-                {e}
-              </button>
-            ))}
-          </div>
-        )}
-        {days.length > 2 && (
-          <div className="mx-auto flex max-w-7xl flex-wrap gap-2 px-5 pb-3 sm:px-8">
-            {days.map((d) => (
-              <button
-                key={d}
-                onClick={() => setDay(d)}
-                className={`rounded-full px-3.5 py-1.5 font-mono text-xs uppercase tracking-wide transition-colors ${
-                  day === d ? "bg-blue text-white" : "bg-card text-muted hover:text-ink"
-                }`}
-              >
-                {d}
-              </button>
-            ))}
-          </div>
-        )}
-        {/* Wraps rather than scrolling sideways: on a phone the row used to be
-            clipped mid-chip, so Swim and Transition were invisible with nothing
-            to suggest more existed. One extra row is worth them being findable. */}
-        <div className="mx-auto flex max-w-7xl flex-wrap gap-2 px-5 pb-4 sm:px-8">
-          {disciplines.map((d) => (
-            <button
-              key={d}
-              onClick={() => setDiscipline(d)}
-              className={`rounded-full border px-3.5 py-1.5 font-mono text-xs uppercase tracking-wide transition-colors ${
-                discipline === d
-                  ? "border-ink bg-ink text-white"
-                  : "border-ink/15 text-muted hover:border-ink hover:text-ink"
-              }`}
-            >
-              {d}
-            </button>
-          ))}
+            ) : null}
+          </form>
         </div>
       </div>
 
       <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8">
-        {results.length > 0 ? (
+        {view.kind === "events" || view.kind === "disciplines" ? (
+          view.folders.length > 0 ? (
+            <FolderGrid view={view} />
+          ) : (
+            <Empty title="Nothing here yet" body="Photos appear here as they are added." />
+          )
+        ) : view.kind === "empty" ? (
+          <Empty
+            title="Nothing here"
+            body="That album is empty, or it has been renamed."
+            action={{ href: "/gallery", label: "Back to all events" }}
+          />
+        ) : filtered.photos.length > 0 ? (
           <>
-            <PhotoGrid photos={results} />
-            {maybes.length > 0 && <MaybeSection photos={maybes} bib={bib} />}
+            <PhotoGrid photos={filtered.photos} />
+            {filtered.maybes.length > 0 && <MaybeSection photos={filtered.maybes} bib={bib} />}
           </>
-        ) : maybes.length > 0 ? (
-          <MaybeSection photos={maybes} bib={bib} soleResult />
+        ) : filtered.maybes.length > 0 ? (
+          <MaybeSection photos={filtered.maybes} bib={bib} soleResult />
         ) : (
-          <div className="flex flex-col items-center gap-3 py-24 text-center">
-            <p className="font-display text-3xl uppercase tracking-wide text-muted">
-              No photos found
-            </p>
-            <p className="max-w-sm text-sm text-muted">
-              {bib
-                ? `We couldn't find bib "${bib}" yet. Results are added a few times a day during the event — try again later, or check the number and try once more.`
-                : "Try a different bib number or clear the filter to browse everything."}
-            </p>
-            {bib && (
-              <button
-                onClick={() => setBib("")}
-                className="mt-2 rounded-full border border-ink px-5 py-2 font-mono text-sm uppercase tracking-wide transition-colors hover:bg-ink hover:text-white"
-              >
-                Clear search
-              </button>
-            )}
-          </div>
+          <Empty
+            title="No photos found"
+            body={
+              bib
+                ? `We couldn't find bib "${bib}" here yet. Results are added a few times a day during the event — try again later, or check the number and try once more.`
+                : "This album is empty."
+            }
+            action={
+              view.kind === "search"
+                ? view.event
+                  ? { href: `/gallery?event=${encodeURIComponent(view.event)}`, label: "Back to this event" }
+                  : { href: "/gallery", label: "Browse by event" }
+                : undefined
+            }
+          />
         )}
       </div>
+    </div>
+  );
+}
+
+function heading(view: BrowseView, shown: number, bib: string) {
+  const plural = (n: number) => `${n} photo${n === 1 ? "" : "s"}`;
+  switch (view.kind) {
+    case "events":
+      return {
+        title: "All photos",
+        subtitle: `${view.folders.length} event${view.folders.length === 1 ? "" : "s"}`,
+      };
+    case "disciplines":
+      return {
+        title: view.event,
+        subtitle: `${view.folders.length} album${view.folders.length === 1 ? "" : "s"}`,
+      };
+    case "photos":
+      return {
+        title: view.discipline,
+        subtitle: bib.trim() ? `${plural(shown)} matching bib "${bib.trim()}"` : plural(shown),
+      };
+    case "search":
+      return {
+        title: "Search results",
+        subtitle: `${plural(shown)} matching bib "${view.bib}"${view.event ? ` in ${view.event}` : " across every event"}`,
+      };
+    case "empty":
+      return { title: view.discipline ?? view.event ?? "Not found", subtitle: "" };
+  }
+}
+
+// Where you are, and the way back out — the folder path from a file window,
+// with every step above the current one clickable.
+function Breadcrumb({ view }: { view: BrowseView }) {
+  if (view.kind === "events") return null;
+
+  const crumbs: { label: string; href?: string }[] = [{ label: "All events", href: "/gallery" }];
+
+  if (view.kind === "search") {
+    if (view.event) {
+      crumbs.push({ label: view.event, href: `/gallery?event=${encodeURIComponent(view.event)}` });
+    }
+    crumbs.push({ label: `Bib ${view.bib}` });
+  } else if (view.kind === "disciplines") {
+    crumbs.push({ label: view.event });
+  } else {
+    const event = view.event;
+    if (event) {
+      crumbs.push(
+        view.kind === "photos"
+          ? { label: event, href: `/gallery?event=${encodeURIComponent(event)}` }
+          : { label: event }
+      );
+    }
+    const leaf = view.kind === "photos" ? view.discipline : view.discipline;
+    if (leaf) crumbs.push({ label: leaf });
+  }
+
+  return (
+    <nav
+      aria-label="Breadcrumb"
+      className="mb-1 flex flex-wrap items-center gap-1.5 font-mono text-xs text-muted"
+    >
+      {crumbs.map((c, i) => (
+        <span key={`${c.label}-${i}`} className="flex items-center gap-1.5">
+          {i > 0 && <span aria-hidden className="text-ink/25">/</span>}
+          {c.href ? (
+            <Link href={c.href} className="uppercase tracking-wide transition-colors hover:text-ink">
+              {c.label}
+            </Link>
+          ) : (
+            <span className="uppercase tracking-wide">{c.label}</span>
+          )}
+        </span>
+      ))}
+    </nav>
+  );
+}
+
+function FolderGrid({ view }: { view: Extract<BrowseView, { kind: "events" | "disciplines" }> }) {
+  return (
+    <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
+      {view.folders.map((folder) => (
+        <FolderTile
+          key={folder.name}
+          folder={folder}
+          href={
+            view.kind === "events"
+              ? `/gallery?event=${encodeURIComponent(folder.name)}`
+              : `/gallery?event=${encodeURIComponent(view.event)}&discipline=${encodeURIComponent(folder.name)}`
+          }
+        />
+      ))}
+    </div>
+  );
+}
+
+// A folder shows one of the photos inside it, so the choice can be made by
+// looking rather than by reading a word like "Crowd" and guessing.
+function FolderTile({ folder, href }: { folder: Folder; href: string }) {
+  const cover = folder.cover;
+  return (
+    <Link href={href} className="group block focus:outline-none">
+      <div className="relative aspect-[4/3] overflow-hidden rounded-md bg-card ring-1 ring-ink/10 transition-shadow group-hover:shadow-lg group-focus-visible:ring-2 group-focus-visible:ring-blue">
+        {cover ? (
+          <Image
+            src={`/api/photo/thumb/${cover.id}`}
+            alt=""
+            fill
+            sizes="(min-width: 1024px) 25vw, (min-width: 640px) 33vw, 50vw"
+            className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+          />
+        ) : null}
+        <div className="absolute inset-0 bg-gradient-to-t from-ink/75 via-ink/10 to-transparent" />
+        <div className="absolute inset-x-0 bottom-0 p-3">
+          <p className="truncate font-display text-lg uppercase leading-tight tracking-wide text-white sm:text-xl">
+            {folder.name}
+          </p>
+          <p className="font-mono text-[11px] text-white/75">
+            {folder.count} photo{folder.count === 1 ? "" : "s"}
+          </p>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function Empty({
+  title,
+  body,
+  action,
+}: {
+  title: string;
+  body: string;
+  action?: { href: string; label: string };
+}) {
+  return (
+    <div className="flex flex-col items-center gap-3 py-24 text-center">
+      <p className="font-display text-3xl uppercase tracking-wide text-muted">{title}</p>
+      <p className="max-w-sm text-sm text-muted">{body}</p>
+      {action && (
+        <Link
+          href={action.href}
+          className="mt-2 rounded-full border border-ink px-5 py-2 font-mono text-sm uppercase tracking-wide transition-colors hover:bg-ink hover:text-white"
+        >
+          {action.label}
+        </Link>
+      )}
     </div>
   );
 }
