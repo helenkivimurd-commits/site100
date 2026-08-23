@@ -64,7 +64,7 @@ export default function Footer() {
               @helenkivimurd.photography
             </a>
             <a
-              href="https://www.facebook.com/share/19NneShmVo/"
+              href="https://www.facebook.com/share/1H6CSUqnHM/"
               target="_blank"
               rel="noreferrer"
               className="flex items-center gap-2 transition-colors hover:text-blue"
