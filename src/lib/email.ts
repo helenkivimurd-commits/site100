@@ -17,7 +17,10 @@ function receiptHtml(order: Order, baseUrl: string): string {
   // Mail clients collapse the end of a message behind "show trimmed content" —
   // Gmail does it as soon as it recognises a block it has seen in the thread
   // before — and a total nobody can see without clicking is no use on a receipt.
-  const totalRow = `<tr><td style="padding:14px 0 0;font-size:14px;font-weight:600;color:#14162b">Total paid</td><td style="padding:14px 0 0;text-align:right;font-family:monospace;font-size:14px;font-weight:600;color:#14162b">${formatMoney(
+  const count = order.photoIds.length;
+  const totalRow = `<tr><td style="padding:14px 0 0;font-size:14px;font-weight:600;color:#14162b">Total paid &middot; ${count} photo${
+    count === 1 ? "" : "s"
+  }</td><td style="padding:14px 0 0;text-align:right;font-family:monospace;font-size:14px;font-weight:600;color:#14162b">${formatMoney(
     order.amountTotal / 100
   )}</td></tr>`;
 
@@ -37,8 +40,54 @@ function receiptHtml(order: Order, baseUrl: string): string {
 <p style="margin:0 0 16px">Tag me on Instagram <a href="https://www.instagram.com/helenkivimurd.photography" style="color:#2e4bff">@helenkivimurd.photography</a> or Facebook <a href="https://www.facebook.com/share/19NneShmVo/" style="color:#2e4bff">Helenkivimurd.photography</a> if you share them &mdash; I&rsquo;d love to see it!</p>
 <p style="margin:0 0 24px">When sharing publicly, please credit photo: Helen Kivimurd (unless agreed otherwise).</p>
 <p style="margin:0 0 32px">Best,<br>Helen Kivimurd</p>
-<p style="color:#5b5f73;font-size:12px;margin:0;border-top:1px solid #edeef2;padding-top:16px">${formatMoney(order.amountTotal / 100)} for ${order.photoIds.length} photo${order.photoIds.length === 1 ? "" : "s"} &middot; Helen Kivimurd Photography</p>
+<p style="color:#5b5f73;font-size:12px;margin:0;border-top:1px solid #edeef2;padding-top:16px">Helen Kivimurd Photography</p>
 </div>`;
+}
+
+// Gmail threads messages that share a subject and a sender, and hides anything
+// in a thread it believes it has already shown — which is why a receipt arrived
+// with part of it behind "show trimmed content". Every receipt now carries the
+// order's own reference, so no two are threaded together and there is nothing
+// for the client to consider a repeat.
+export function receiptSubject(order: Order): string {
+  // Short, readable, and unique per order. Derived from the Stripe session, so
+  // it also gives a customer something to quote when they get in touch.
+  const ref = order.sessionId.replace(/[^a-zA-Z0-9]/g, "").slice(-6).toUpperCase();
+  return `Your race photos — order ${ref}`;
+}
+
+// A plain-text alternative alongside the HTML. Some clients show it instead,
+// and a message with both looks less like bulk mail to a spam filter.
+function receiptText(order: Order, baseUrl: string): string {
+  const lines = order.photoIds.map((id) => `${id.toUpperCase()}: ${downloadUrl(baseUrl, order.token, id)}`);
+  const expires = new Date(order.expiresAt).toLocaleDateString("en-IE", {
+    day: "numeric", month: "long", year: "numeric",
+  });
+  const count = order.photoIds.length;
+  return [
+    "Hi!",
+    "",
+    "Thank you — truly!",
+    "",
+    "You did something incredible out there, and it means a lot that you'd let me be the one to capture it. Your photos are below, yours to keep forever. You earned it.",
+    "",
+    ...lines,
+    "",
+    `Total paid · ${count} photo${count === 1 ? "" : "s"}: ${formatMoney(order.amountTotal / 100)}`,
+    "",
+    `Full resolution, no watermark. These links work until ${expires} — please save the files somewhere safe before then.`,
+    "",
+    "Every purchase helps me chase a dream of my own, so thank you for being part of that.",
+    "",
+    "Tag me on Instagram @helenkivimurd.photography or Facebook Helenkivimurd.photography if you share them — I'd love to see it!",
+    "",
+    "When sharing publicly, please credit photo: Helen Kivimurd (unless agreed otherwise).",
+    "",
+    "Best,",
+    "Helen Kivimurd",
+    "",
+    "Helen Kivimurd Photography",
+  ].join("\n");
 }
 
 // Never throws. A failed email must not fail the webhook — the customer can
@@ -71,8 +120,9 @@ export async function sendReceiptEmail(order: Order, baseUrl: string): Promise<b
         from,
         to: [order.email],
         ...(replyTo ? { reply_to: [replyTo] } : {}),
-        subject: "Your race photos — Helen Kivimurd Photography",
+        subject: receiptSubject(order),
         html: receiptHtml(order, baseUrl),
+        text: receiptText(order, baseUrl),
       }),
     });
 
