@@ -73,7 +73,7 @@ export default function AboutPage() {
                 @helenkivimurd.photography
               </a>
               <a
-                href="https://www.facebook.com/share/1H6CSUqnHM/"
+                href="https://www.facebook.com/people/helenkivimurdphotography/61593925822412/"
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex items-center gap-2.5 rounded-full border border-ink/15 px-5 py-3 font-mono text-sm transition-colors hover:border-blue hover:text-blue"

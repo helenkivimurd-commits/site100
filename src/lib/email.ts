@@ -37,7 +37,7 @@ function receiptHtml(order: Order, baseUrl: string): string {
 <table style="width:100%;border-collapse:collapse;margin:0 0 20px">${links}${totalRow}</table>
 <p style="color:#5b5f73;font-size:13px;margin:0 0 24px">Full resolution, no watermark. These links work until <strong>${expires}</strong> &mdash; please save the files somewhere safe before then.</p>
 <p style="margin:0 0 16px">Every purchase helps me chase a dream of my own, so thank you for being part of that.</p>
-<p style="margin:0 0 16px">Tag me on Instagram <a href="https://www.instagram.com/helenkivimurd.photography" style="color:#2e4bff">@helenkivimurd.photography</a> or Facebook <a href="https://www.facebook.com/share/1H6CSUqnHM/" style="color:#2e4bff">Helenkivimurd.photography</a> if you share them &mdash; I&rsquo;d love to see it!</p>
+<p style="margin:0 0 16px">Tag me on Instagram <a href="https://www.instagram.com/helenkivimurd.photography" style="color:#2e4bff">@helenkivimurd.photography</a> or Facebook <a href="https://www.facebook.com/people/helenkivimurdphotography/61593925822412/" style="color:#2e4bff">Helenkivimurd.photography</a> if you share them &mdash; I&rsquo;d love to see it!</p>
 <p style="margin:0 0 24px">When sharing publicly, please credit photo: Helen Kivimurd (unless agreed otherwise).</p>
 <p style="margin:0 0 32px">Best,<br>Helen Kivimurd</p>
 <p style="color:#5b5f73;font-size:12px;margin:0;border-top:1px solid #edeef2;padding-top:16px">Helen Kivimurd Photography</p>
