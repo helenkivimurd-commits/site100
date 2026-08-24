@@ -180,6 +180,20 @@ function formatRaceDay(iso: string): string {
       let saved: RowSource[] | null = null;
       let lastError = "";
 
+      // Read a byte off the file before trying to send it. "Connection lost"
+      // used to cover this case too, which sent us hunting a network fault that
+      // was not there: a file the browser cannot read — an external drive
+      // ejected, a photo iCloud has offloaded, something moved since it was
+      // picked — fails in exactly the same way as a dropped upload.
+      try {
+        await file.slice(0, 1).arrayBuffer();
+      } catch {
+        failed.push(
+          `${file.name} — couldn't be read from disk. If the photos are on an external drive or in iCloud, make sure they are available on this Mac.`
+        );
+        continue;
+      }
+
       for (let attempt = 1; attempt <= UPLOAD_ATTEMPTS; attempt++) {
         try {
           const res = await fetch("/api/photos", { method: "POST", body: form });
@@ -194,6 +208,7 @@ function formatRaceDay(iso: string): string {
           // fault might be temporary.
           if (res.status !== 502 && res.status !== 503 && res.status !== 504) break;
         } catch {
+          // The file read fine a moment ago, so this really is the network.
           lastError = `${file.name} — connection lost.`;
         }
 
