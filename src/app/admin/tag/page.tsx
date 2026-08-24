@@ -177,7 +177,11 @@ export default function TagPage() {
         // Same runner as the last photo — the commonest case by far.
         e.preventDefault();
         save(lastBibs, false);
-      } else if (e.key.toLowerCase() === "n" && value === "") {
+      } else if (e.key.toLowerCase() === "n") {
+        // Whatever has been typed, N means there is no readable number. It used
+        // to be ignored unless the field was empty, which made it look broken:
+        // one stray character — including a previous "n" that had landed in the
+        // field as text — and the key stopped working with nothing to show why.
         e.preventDefault();
         save("", true);
       } else if (e.key === "ArrowRight") {
@@ -258,7 +262,10 @@ export default function TagPage() {
           <input
             ref={inputRef}
             value={value}
-            onChange={(e) => setValue(e.target.value)}
+            // Digits, spaces and commas only. A letter in here could never be
+            // part of a bib, and one sitting unnoticed in the field was enough
+            // to make the shortcuts behave strangely.
+            onChange={(e) => setValue(e.target.value.replace(/[^0-9, ]/g, ""))}
             inputMode="numeric"
             autoFocus
             onBlur={(e) => {
