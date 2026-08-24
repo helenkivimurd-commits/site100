@@ -149,6 +149,27 @@ export default function TagPage() {
     function onKey(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
+      // Typing a number has to work the moment a photo appears, without
+      // clicking anything first. Clicking the photo to zoom, or touching one of
+      // the pickers, moves the focus off the field — and then the digits went
+      // nowhere. Anything typed outside the field is taken here instead, so the
+      // keyboard always reaches the number.
+      const inField = e.target === inputRef.current;
+      if (!inField) {
+        if (/^[0-9]$/.test(e.key)) {
+          e.preventDefault();
+          setValue((v) => v + e.key);
+          inputRef.current?.focus();
+          return;
+        }
+        if (e.key === "Backspace") {
+          e.preventDefault();
+          setValue((v) => v.slice(0, -1));
+          inputRef.current?.focus();
+          return;
+        }
+      }
+
       if (e.key === "Enter") {
         e.preventDefault();
         save(value, false);
@@ -222,7 +243,10 @@ export default function TagPage() {
           key={current.id}
           src={`/api/photos/original?id=${encodeURIComponent(current.id)}`}
           alt=""
-          onClick={() => setZoom((z) => !z)}
+          onClick={() => {
+            setZoom((z) => !z);
+            inputRef.current?.focus();
+          }}
           className={`h-full w-full transition-transform duration-150 ${
             zoom ? "scale-[2.5] cursor-zoom-out object-contain" : "cursor-zoom-in object-contain"
           }`}
@@ -237,6 +261,14 @@ export default function TagPage() {
             onChange={(e) => setValue(e.target.value)}
             inputMode="numeric"
             autoFocus
+            onBlur={(e) => {
+              // Unless the photographer has deliberately gone to a picker, the
+              // field takes the keyboard back: on this screen there is nothing
+              // else to type into.
+              const goingTo = e.relatedTarget as HTMLElement | null;
+              if (goingTo?.tagName === "SELECT" || goingTo?.tagName === "A") return;
+              requestAnimationFrame(() => inputRef.current?.focus());
+            }}
             placeholder="Bib number"
             aria-label="Bib number"
             className="min-w-0 flex-1 rounded-md border border-ink/15 px-4 py-3 font-mono text-2xl text-ink outline-none focus:border-ink"
