@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DISCIPLINES, type Discipline } from "@/lib/types";
+import { selectionAfterClick } from "@/lib/selection";
 import PhotoInspector from "./PhotoInspector";
 
 type Row = {
@@ -69,6 +70,11 @@ export default function AdminPage() {
   // same across a whole race. Editing 268 of them one at a time is not work
   // anybody should do by hand.
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  // The row a plain click last landed on. Shift-clicking another row selects
+  // everything between the two, the way a file list does — tagging a race means
+  // picking out long runs of consecutive photos, and ticking three hundred
+  // boxes one at a time is the slowest part of the job.
+  const [anchorId, setAnchorId] = useState<string | null>(null);
   const [bulkDay, setBulkDay] = useState("");
   const [bulkEvent, setBulkEvent] = useState("");
   const [bulkDiscipline, setBulkDiscipline] = useState<Discipline | "">("");
@@ -249,12 +255,19 @@ function formatRaceDay(iso: string): string {
     save(id, { discipline });
   }
 
-  function toggleSelected(id: string) {
+  function toggleSelected(id: string, extendRange = false) {
     setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
+      const result = selectionAfterClick({
+        // What is on screen, in the order it appears — so a range follows what
+        // was actually clicked even with "Unreviewed only" on.
+        visibleIds: visible.map((r) => r.id),
+        clickedId: id,
+        anchorId,
+        selected: prev,
+        extendRange,
+      });
+      setAnchorId(result.anchorId);
+      return result.selected;
     });
   }
 
@@ -579,13 +592,29 @@ function formatRaceDay(iso: string): string {
               filter === "unreviewed" && row.reviewed ? "opacity-45" : ""
             }`}
           >
-            <input
-              type="checkbox"
-              checked={selected.has(row.id)}
-              onChange={() => toggleSelected(row.id)}
-              aria-label={`Select ${row.title}`}
-              className="shrink-0"
-            />
+            {/* A generous target: the checkbox is scaled up and the padding
+                around it is part of the label, so the whole corner is clickable
+                rather than a 13px square. */}
+            <label className="-m-1 shrink-0 cursor-pointer p-1">
+              <input
+                type="checkbox"
+                checked={selected.has(row.id)}
+                // The shift key is read from the click, not the change: a
+                // change event carries no modifier keys, so asking it whether
+                // shift was held always answered no.
+                onClick={(e) => {
+                  // Shift-clicking otherwise drags the browser's text selection
+                  // across the rows in between and turns the page blue.
+                  if (e.shiftKey) window.getSelection()?.removeAllRanges();
+                  toggleSelected(row.id, e.shiftKey);
+                }}
+                // Controlled by `checked` above and updated in onClick; React
+                // asks for this handler all the same.
+                onChange={() => {}}
+                aria-label={`Select ${row.title}`}
+                className="h-5 w-5 cursor-pointer accent-blue"
+              />
+            </label>
             <button
               type="button"
               onClick={() => setInspecting(i)}
