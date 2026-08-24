@@ -180,19 +180,6 @@ function formatRaceDay(iso: string): string {
       let saved: RowSource[] | null = null;
       let lastError = "";
 
-      // Read a byte off the file before trying to send it. "Connection lost"
-      // used to cover this case too, which sent us hunting a network fault that
-      // was not there: a file the browser cannot read — an external drive
-      // ejected, a photo iCloud has offloaded, something moved since it was
-      // picked — fails in exactly the same way as a dropped upload.
-      try {
-        await file.slice(0, 1).arrayBuffer();
-      } catch {
-        failed.push(
-          `${file.name} — couldn't be read from disk. If the photos are on an external drive or in iCloud, make sure they are available on this Mac.`
-        );
-        continue;
-      }
 
       for (let attempt = 1; attempt <= UPLOAD_ATTEMPTS; attempt++) {
         try {
@@ -223,7 +210,22 @@ function formatRaceDay(iso: string): string {
       }
 
       if (!saved) {
-        failed.push(lastError || `${file.name} failed.`);
+        // Only now, having actually failed, is it worth asking why. Reading a
+        // byte off the file separates a photo the browser cannot get at from an
+        // upload that did not land.
+        //
+        // This check used to run BEFORE the upload and skip the file when it
+        // threw, which was a bad way round: a check meant to explain a failure
+        // was able to cause one, and it rejected an entire batch of perfectly
+        // readable photos without a single request reaching the server. A
+        // diagnostic must never be able to block the thing it is diagnosing.
+        let reason = lastError || `${file.name} failed.`;
+        try {
+          await file.slice(0, 1).arrayBuffer();
+        } catch {
+          reason = `${file.name} — couldn't be read from disk. If the photos are on an external drive or in iCloud, make sure they are available on this Mac.`;
+        }
+        failed.push(reason);
         continue;
       }
 
