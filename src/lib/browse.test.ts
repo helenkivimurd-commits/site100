@@ -137,12 +137,29 @@ test("no album tile when every photo in the event has a bib", () => {
   assert.ok(!view.folders.some((f) => f.noBib));
 });
 
-test("the album can be opened across every event at once", () => {
+test("with no race chosen, the albums are offered rather than merged", () => {
+  const catalogue = [
+    ...all,
+    { ...photo("i", "Ironman 70.3", "Swim"), reviewed: true },
+    { ...photo("j", "Ironman 70.3", "Bike"), reviewed: true },
+  ];
+  const view = browse(catalogue, { noBib: true });
+  assert.equal(view.kind, "nobibFolders");
+  if (view.kind !== "nobibFolders") return;
+  // One tile per race, named and counted — never one pile of all three.
+  assert.deepEqual(view.folders.map((f) => [f.name, f.count]), [
+    ["Ironman 70.3", 2],
+    ["Sunset run", 1],
+  ]);
+  assert.ok(view.folders.every((f) => f.noBib));
+});
+
+test("the chooser appears even when there is only one race", () => {
+  // She wants to see it working before the other events are uploaded.
   const view = browse(all, { noBib: true });
-  assert.equal(view.kind, "nobib");
-  if (view.kind !== "nobib") return;
-  assert.equal(view.event, undefined);
-  assert.deepEqual(view.photos.map((p) => p.id), ["c"]);
+  assert.equal(view.kind, "nobibFolders");
+  if (view.kind !== "nobibFolders") return;
+  assert.deepEqual(view.folders.map((f) => f.name), ["Sunset run"]);
 });
 
 test("an empty search offers each event's unreadable photos separately", () => {

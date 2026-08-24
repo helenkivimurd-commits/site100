@@ -136,7 +136,17 @@ export default function GalleryClient({
       )}
 
       <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8">
-        {view.kind === "events" || view.kind === "disciplines" ? (
+        {view.kind === "nobibFolders" ? (
+          view.folders.length > 0 ? (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-8 sm:grid-cols-3 lg:grid-cols-4">
+              {view.folders.map((f) => (
+                <FolderTile key={f.name} folder={f} href={albumHref(f.name)} />
+              ))}
+            </div>
+          ) : (
+            <Empty title="Nothing here yet" body="No photos have been marked as having no visible bib." />
+          )
+        ) : view.kind === "events" || view.kind === "disciplines" ? (
           view.folders.length > 0 ? (
             <FolderGrid view={view} />
           ) : (
@@ -158,7 +168,7 @@ export default function GalleryClient({
         ) : bib.trim() ? (
           <NothingFound
             event={scopeEvent}
-            noBibByEvent={view.kind === "search" ? view.noBibByEvent : []}
+            hasAnyNoBib={view.kind === "search" ? view.noBibByEvent.length > 0 : true}
           />
         ) : (
           <Empty title="No photos found" body="This album is empty." />
@@ -173,12 +183,15 @@ export default function GalleryClient({
 // a search can come up empty and sends them somewhere rather than nowhere.
 function NothingFound({
   event,
-  noBibByEvent,
+  hasAnyNoBib,
 }: {
   event?: string;
-  noBibByEvent: { event: string; count: number }[];
+  hasAnyNoBib: boolean;
 }) {
-  const albumHref = (name: string) => `/gallery?event=${encodeURIComponent(name)}&nobib=1`;
+  // A search made inside one race goes straight to that race's album — they
+  // have already said which one they were in. A search across everything goes
+  // to the list of albums, which asks.
+  const href = event ? `/gallery?event=${encodeURIComponent(event)}&nobib=1` : "/gallery?nobib=1";
 
   return (
     <div className="mx-auto flex max-w-xl flex-col items-center gap-4 py-20 text-center">
@@ -188,39 +201,14 @@ function NothingFound({
         there isn&rsquo;t a photo of you. Scroll through the photos yourself, and see if you can
         find yourself &mdash; I hope you do!
       </p>
-
-      {noBibByEvent.length > 1 ? (
-        // Every event's album carries the same name, so the choice has to be
-        // made by race. They know which one they ran; the counts tell them what
-        // they are taking on before they start scrolling.
-        <>
-          <p className="mt-2 font-mono text-xs uppercase tracking-wide text-muted">
-            Which race were you in?
-          </p>
-          <div className="mt-1 flex w-full flex-col gap-2">
-            {noBibByEvent.map(({ event: name, count }) => (
-              <Link
-                key={name}
-                href={albumHref(name)}
-                className="flex items-center justify-between gap-4 rounded-md border border-ink/15 px-5 py-3.5 text-left transition-colors hover:border-ink hover:bg-card"
-              >
-                <span className="font-display text-lg uppercase tracking-wide">{name}</span>
-                <span className="shrink-0 font-mono text-xs text-muted">
-                  {count} photo{count === 1 ? "" : "s"}
-                </span>
-              </Link>
-            ))}
-          </div>
-        </>
-      ) : noBibByEvent.length === 1 ? (
+      {hasAnyNoBib && (
         <Link
-          href={albumHref(noBibByEvent[0].event)}
-          className="mt-1 rounded-full bg-ink px-6 py-3 font-mono text-sm uppercase tracking-wide text-white transition-colors hover:bg-ink/85"
+          href={href}
+          className="mt-2 rounded-full bg-ink px-8 py-4 font-mono text-sm uppercase tracking-wide text-white transition-colors hover:bg-ink/85"
         >
-          See photos with no visible bib
+          Browse no bib visible folders
         </Link>
-      ) : null}
-
+      )}
       <Link
         href={event ? `/gallery?event=${encodeURIComponent(event)}` : "/gallery"}
         className="font-mono text-xs uppercase tracking-wide text-muted transition-colors hover:text-ink"
@@ -271,6 +259,11 @@ function heading(view: BrowseView, shown: number, bib: string) {
         title: "Search results",
         subtitle: `${plural(shown)} matching bib "${view.bib}"${view.event ? ` in ${view.event}` : " across every event"}`,
       };
+    case "nobibFolders":
+      return {
+        title: NO_BIB_ALBUM,
+        subtitle: "Which race were you in?",
+      };
     case "nobib":
       return {
         title: NO_BIB_ALBUM,
@@ -297,6 +290,8 @@ function Breadcrumb({ view }: { view: BrowseView }) {
     crumbs.push({ label: `Bib ${view.bib}` });
   } else if (view.kind === "disciplines") {
     crumbs.push({ label: view.event });
+  } else if (view.kind === "nobibFolders") {
+    crumbs.push({ label: NO_BIB_ALBUM });
   } else if (view.kind === "nobib") {
     if (view.event) {
       crumbs.push({ label: view.event, href: `/gallery?event=${encodeURIComponent(view.event)}` });

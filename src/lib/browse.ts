@@ -77,6 +77,12 @@ export type BrowseView =
    * is still in Run, and is here too, so that browsing Run misses nothing and
    * a runner who searched and found nothing has one place to look.
    */
+  /**
+   * The unreadable-bib albums, one per event. Reached from the button offered
+   * when a search finds nothing: every album is called the same thing, so the
+   * choice has to be made by race before any photos are shown.
+   */
+  | { kind: "nobibFolders"; folders: Folder[] }
   | {
       kind: "nobib";
       event?: string;
@@ -139,8 +145,28 @@ export function browse(
 
   // The gathered album, either for one event or across all of them. Reached
   // from its own tile, and from the button offered when a search finds nothing.
+  if (noBib && !event) {
+    // No race chosen yet: offer the albums rather than merging them, so nobody
+    // scrolls two races they were never in.
+    const unreadable = all.filter(hasNoVisibleBib);
+    const byEvent = new Map<string, Photo[]>();
+    for (const photo of unreadable) {
+      const name = (photo.event ?? "").trim();
+      if (!name) continue;
+      const group = byEvent.get(name);
+      if (group) group.push(photo);
+      else byEvent.set(name, [photo]);
+    }
+    return {
+      kind: "nobibFolders",
+      folders: [...byEvent.entries()]
+        .map(([name, list]) => ({ name, count: list.length, cover: list[0] ?? null, noBib: true as const }))
+        .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name)),
+    };
+  }
+
   if (noBib) {
-    const scope = event ? all.filter((p) => p.event === event) : all;
+    const scope = all.filter((p) => p.event === event);
     const unreadable = scope.filter(hasNoVisibleBib);
 
     // An Ironman's worth of unreadable photos is a long scroll. Someone who
