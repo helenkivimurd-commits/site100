@@ -14,7 +14,21 @@ export type Folder = {
   count: number;
   /** Photo whose thumbnail stands in for the folder. */
   cover: Photo | null;
+  /** The gathered "bib not visible" album rather than a real discipline. */
+  noBib?: true;
 };
+
+/** The album's name wherever it is shown. */
+export const NO_BIB_ALBUM = "No bib visible";
+
+/**
+ * Photos the photographer looked at and marked as having no readable bib —
+ * reviewed, but with no number recorded. Not the same as a photo nobody has
+ * got to yet, which simply has no bib recorded so far.
+ */
+export function hasNoVisibleBib(photo: Photo): boolean {
+  return photo.reviewed && photo.bibs.length === 0;
+}
 
 export type BrowseView =
   /** No event chosen: the list of events. */
@@ -28,6 +42,13 @@ export type BrowseView =
    * everything at the top, or just the chosen event once inside one.
    */
   | { kind: "search"; bib: string; event?: string; photos: Photo[]; maybes: Photo[] }
+  /**
+   * The gathered album of photos whose bib could not be read. Cuts across the
+   * disciplines rather than replacing them: a run photo with an unreadable bib
+   * is still in Run, and is here too, so that browsing Run misses nothing and
+   * a runner who searched and found nothing has one place to look.
+   */
+  | { kind: "nobib"; event?: string; photos: Photo[] }
   /** An event or discipline in the URL that no photo actually uses. */
   | { kind: "empty"; event?: string; discipline?: string };
 
@@ -71,9 +92,21 @@ export function splitByBib(photos: Photo[], bib: string) {
 
 export function browse(
   all: Photo[],
-  { event, discipline, bib }: { event?: string; discipline?: string; bib?: string }
+  {
+    event,
+    discipline,
+    bib,
+    noBib,
+  }: { event?: string; discipline?: string; bib?: string; noBib?: boolean }
 ): BrowseView {
   const query = (bib ?? "").trim();
+
+  // The gathered album, either for one event or across all of them. Reached
+  // from its own tile, and from the button offered when a search finds nothing.
+  if (noBib) {
+    const scope = event ? all.filter((p) => p.event === event) : all;
+    return { kind: "nobib", event, photos: scope.filter(hasNoVisibleBib) };
+  }
 
   // A bib typed before any event is chosen searches the whole catalogue and
   // goes straight to the results. Someone who knows their number should never
@@ -94,7 +127,21 @@ export function browse(
     return { kind: "search", bib: query, event, ...splitByBib(inEvent, query) };
   }
 
-  if (!discipline) return { kind: "disciplines", event, folders: foldersBy(inEvent, "discipline") };
+  if (!discipline) {
+    const folders = foldersBy(inEvent, "discipline");
+    // Listed after the real disciplines, because it is where you look when the
+    // ordinary route has not worked rather than a place to start.
+    const unreadable = inEvent.filter(hasNoVisibleBib);
+    if (unreadable.length > 0) {
+      folders.push({
+        name: NO_BIB_ALBUM,
+        count: unreadable.length,
+        cover: unreadable[0] ?? null,
+        noBib: true,
+      });
+    }
+    return { kind: "disciplines", event, folders };
+  }
 
   const inDiscipline = inEvent.filter((p) => p.discipline === discipline);
   if (inDiscipline.length === 0) return { kind: "empty", event, discipline };

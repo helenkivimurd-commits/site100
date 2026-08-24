@@ -13,15 +13,15 @@ export const metadata = {
 export default async function GalleryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ bib?: string; event?: string; discipline?: string }>;
+  searchParams: Promise<{ bib?: string; event?: string; discipline?: string; nobib?: string }>;
 }) {
-  const { bib, event, discipline } = await searchParams;
+  const { bib, event, discipline, nobib } = await searchParams;
   const photos = await getPhotos();
 
   // Which of the three levels this is — events, disciplines, or photos — is
   // decided here so that only what the level needs crosses to the browser.
   // Opening one discipline sends that discipline, not the whole catalogue.
-  const view = browse(photos, { event, discipline, bib });
+  const view = browse(photos, { event, discipline, bib, noBib: nobib === "1" });
 
   return <GalleryClient view={view} initialBib={bib ?? ""} />;
 }

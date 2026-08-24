@@ -7,7 +7,7 @@ import { useMemo, useState, type FormEvent } from "react";
 import PhotoGrid from "@/components/PhotoGrid";
 import type { Photo } from "@/lib/types";
 import type { BrowseView, Folder } from "@/lib/browse";
-import { splitByBib } from "@/lib/browse";
+import { splitByBib, NO_BIB_ALBUM } from "@/lib/browse";
 
 // The gallery browses like folders: events, then the disciplines inside the
 // chosen one, then the photos. Which level is showing was decided on the
@@ -28,7 +28,7 @@ export default function GalleryClient({
   const router = useRouter();
   const [bib, setBib] = useState(initialBib);
 
-  const insideFolder = view.kind === "photos";
+  const insideFolder = view.kind === "photos" || view.kind === "nobib";
 
   // Inside a folder the filtering is instant, over photos the browser already
   // holds. At the top level there is nothing here to filter — the whole
@@ -36,7 +36,9 @@ export default function GalleryClient({
   // the server does the search.
   const filtered = useMemo(() => {
     if (view.kind === "search") return { photos: view.photos, maybes: view.maybes };
-    if (view.kind !== "photos") return { photos: [] as Photo[], maybes: [] as Photo[] };
+    if (view.kind !== "photos" && view.kind !== "nobib") {
+      return { photos: [] as Photo[], maybes: [] as Photo[] };
+    }
     if (!bib.trim()) return { photos: view.photos, maybes: [] as Photo[] };
     return splitByBib(view.photos, bib.trim());
   }, [view, bib]);
@@ -44,7 +46,9 @@ export default function GalleryClient({
   // Whichever event is currently open stays open when a bib is submitted, so
   // searching from inside a race searches that race and not the whole shop.
   const scopeEvent =
-    view.kind === "disciplines" || view.kind === "search" ? view.event : undefined;
+    view.kind === "disciplines" || view.kind === "search" || view.kind === "nobib"
+      ? view.event
+      : undefined;
 
   function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -137,24 +141,38 @@ export default function GalleryClient({
           </>
         ) : filtered.maybes.length > 0 ? (
           <MaybeSection photos={filtered.maybes} bib={bib} soleResult />
+        ) : bib.trim() ? (
+          <NothingFound event={scopeEvent} />
         ) : (
-          <Empty
-            title="No photos found"
-            body={
-              bib
-                ? `We couldn't find bib "${bib}" here yet. Results are added a few times a day during the event — try again later, or check the number and try once more.`
-                : "This album is empty."
-            }
-            action={
-              view.kind === "search"
-                ? view.event
-                  ? { href: `/gallery?event=${encodeURIComponent(view.event)}`, label: "Back to this event" }
-                  : { href: "/gallery", label: "Browse by event" }
-                : undefined
-            }
-          />
+          <Empty title="No photos found" body="This album is empty." />
         )}
       </div>
+    </div>
+  );
+}
+
+// What a runner sees when their number finds nothing. A dead end here is the
+// worst moment on the site — they came to find themselves — so it explains why
+// a search can come up empty and sends them somewhere rather than nowhere.
+function NothingFound({ event }: { event?: string }) {
+  const href = event ? `/gallery?event=${encodeURIComponent(event)}&nobib=1` : "/gallery?nobib=1";
+  return (
+    <div className="mx-auto flex max-w-xl flex-col items-center gap-4 py-20 text-center">
+      <p className="font-display text-3xl uppercase tracking-wide text-muted">No photos found</p>
+      <p className="text-sm leading-relaxed text-muted">
+        Due to the harsh weather on the race days, a lot of bibs got damaged so the numbers
+        can&rsquo;t be seen on the photo. That doesn&rsquo;t necessarily mean there isn&rsquo;t a
+        photo of you. Scroll through the photos yourself, and I hope that you could find yourself.
+      </p>
+      <Link
+        href={href}
+        className="mt-1 rounded-full bg-ink px-6 py-3 font-mono text-sm uppercase tracking-wide text-white transition-colors hover:bg-ink/85"
+      >
+        See photos with no visible bib
+      </Link>
+      <Link href="/gallery" className="font-mono text-xs uppercase tracking-wide text-muted transition-colors hover:text-ink">
+        or browse every event
+      </Link>
     </div>
   );
 }
@@ -182,6 +200,11 @@ function heading(view: BrowseView, shown: number, bib: string) {
         title: "Search results",
         subtitle: `${plural(shown)} matching bib "${view.bib}"${view.event ? ` in ${view.event}` : " across every event"}`,
       };
+    case "nobib":
+      return {
+        title: NO_BIB_ALBUM,
+        subtitle: bib.trim() ? `${plural(shown)} matching bib "${bib.trim()}"` : plural(shown),
+      };
     case "empty":
       return { title: view.discipline ?? view.event ?? "Not found", subtitle: "" };
   }
@@ -201,6 +224,11 @@ function Breadcrumb({ view }: { view: BrowseView }) {
     crumbs.push({ label: `Bib ${view.bib}` });
   } else if (view.kind === "disciplines") {
     crumbs.push({ label: view.event });
+  } else if (view.kind === "nobib") {
+    if (view.event) {
+      crumbs.push({ label: view.event, href: `/gallery?event=${encodeURIComponent(view.event)}` });
+    }
+    crumbs.push({ label: NO_BIB_ALBUM });
   } else {
     const event = view.event;
     if (event) {
@@ -210,8 +238,7 @@ function Breadcrumb({ view }: { view: BrowseView }) {
           : { label: event }
       );
     }
-    const leaf = view.kind === "photos" ? view.discipline : view.discipline;
-    if (leaf) crumbs.push({ label: leaf });
+    if (view.discipline) crumbs.push({ label: view.discipline });
   }
 
   return (
@@ -245,7 +272,9 @@ function FolderGrid({ view }: { view: Extract<BrowseView, { kind: "events" | "di
           href={
             view.kind === "events"
               ? `/gallery?event=${encodeURIComponent(folder.name)}`
-              : `/gallery?event=${encodeURIComponent(view.event)}&discipline=${encodeURIComponent(folder.name)}`
+              : folder.noBib
+                ? `/gallery?event=${encodeURIComponent(view.event)}&nobib=1`
+                : `/gallery?event=${encodeURIComponent(view.event)}&discipline=${encodeURIComponent(folder.name)}`
           }
         />
       ))}

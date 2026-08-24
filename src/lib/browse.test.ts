@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { browse, splitByBib } from "./browse.ts";
+import { browse, splitByBib, NO_BIB_ALBUM } from "./browse.ts";
 import type { Photo } from "./types.ts";
 
 const photo = (id: string, event: string, discipline: string, bibs: string[] = []): Photo =>
@@ -104,4 +104,43 @@ test("the same bib from the top still finds both events", () => {
   if (view.kind !== "search") return;
   assert.equal(view.event, undefined);
   assert.deepEqual(view.photos.map((p) => p.id), ["a", "d"]);
+});
+
+test("the no-bib album gathers only photos looked at and found unreadable", () => {
+  const catalogue = [
+    ...all,
+    { ...photo("h", "Sunset run", "Run"), reviewed: true },   // looked at, no bib
+    { ...photo("i", "Sunset run", "Run"), reviewed: false },  // not looked at yet
+  ];
+  const view = browse(catalogue, { event: "Sunset run", noBib: true });
+  assert.equal(view.kind, "nobib");
+  if (view.kind !== "nobib") return;
+  // "c" is the Crowd photo with no bibs; "h" was marked No bib. "i" is simply
+  // untagged so far and must not be presented as unreadable.
+  assert.deepEqual(view.photos.map((p) => p.id), ["c", "h"]);
+});
+
+test("the album appears alongside the disciplines, listed last", () => {
+  const view = browse(all, { event: "Sunset run" });
+  assert.equal(view.kind, "disciplines");
+  if (view.kind !== "disciplines") return;
+  assert.equal(view.folders.at(-1)?.name, NO_BIB_ALBUM);
+  assert.equal(view.folders.at(-1)?.noBib, true);
+  // The run photos are still in Run — the album cuts across, it does not move.
+  assert.equal(view.folders.find((f) => f.name === "Run")?.count, 2);
+});
+
+test("no album tile when every photo in the event has a bib", () => {
+  const view = browse(all, { event: "Ironman 70.3" });
+  assert.equal(view.kind, "disciplines");
+  if (view.kind !== "disciplines") return;
+  assert.ok(!view.folders.some((f) => f.noBib));
+});
+
+test("the album can be opened across every event at once", () => {
+  const view = browse(all, { noBib: true });
+  assert.equal(view.kind, "nobib");
+  if (view.kind !== "nobib") return;
+  assert.equal(view.event, undefined);
+  assert.deepEqual(view.photos.map((p) => p.id), ["c"]);
 });
