@@ -53,6 +53,10 @@ function toRow(p: RowSource): Row {
   };
 }
 
+// Three goes at each photo. Enough to ride out a restart or a moment of bad
+// wifi; few enough that a genuinely broken file does not hold up the queue.
+const UPLOAD_ATTEMPTS = 3;
+
 const FALLBACK_EVENT = "IRONMAN 70.3 Tallinn European Championship";
 
 export default function AdminPage() {
@@ -168,32 +172,67 @@ function formatRaceDay(iso: string): string {
       form.append("day", day);
       form.append("discipline", uploadDiscipline);
 
-      try {
-        const res = await fetch("/api/photos", { method: "POST", body: form });
-        if (!res.ok) {
-          const body = await res.json().catch(() => ({}));
-          failed.push(body.error ?? `${file.name} failed.`);
-          continue;
-        }
-        const body = (await res.json()) as { created: RowSource[] };
-        added.push(...body.created);
+      // A dropped connection used to lose that photo for good, and over a
+      // batch of thousands there are always some: a moment of bad wifi, the
+      // laptop dozing, the server restarting under a deploy. Each one is
+      // retried before being given up on, so a blip costs seconds rather than
+      // a photo the photographer then has to find and send again.
+      let saved: RowSource[] | null = null;
+      let lastError = "";
 
-        // Appended as each one lands, so a long batch fills the list as it goes
-        // instead of sitting blank until the end.
-        setRows((prev) => [...prev, ...body.created.map(toRow)]);
-        setUnreviewedSnapshot((prev) => {
-          const next = new Set(prev);
-          for (const photo of body.created) next.add(photo.id);
-          return next;
-        });
-      } catch {
-        failed.push(`${file.name} — connection lost.`);
+      for (let attempt = 1; attempt <= UPLOAD_ATTEMPTS; attempt++) {
+        try {
+          const res = await fetch("/api/photos", { method: "POST", body: form });
+          if (res.ok) {
+            saved = ((await res.json()) as { created: RowSource[] }).created;
+            break;
+          }
+          const body = await res.json().catch(() => ({}));
+          lastError = body.error ?? `${file.name} failed.`;
+          // A file the server has refused outright — too big, wrong format, not
+          // an image it can read — will be refused again. Only retry when the
+          // fault might be temporary.
+          if (res.status !== 502 && res.status !== 503 && res.status !== 504) break;
+        } catch {
+          lastError = `${file.name} — connection lost.`;
+        }
+
+        if (attempt < UPLOAD_ATTEMPTS) {
+          setUploadStatus(
+            `Uploading ${index + 1} of ${list.length}: ${file.name} — retrying (${attempt} of ${UPLOAD_ATTEMPTS - 1})…`
+          );
+          // Backing off a little gives a restarting server time to come back
+          // rather than spending all three tries inside the same outage.
+          await new Promise((r) => setTimeout(r, attempt * 2000));
+        }
       }
+
+      if (!saved) {
+        failed.push(lastError || `${file.name} failed.`);
+        continue;
+      }
+
+      added.push(...saved);
+
+      // Appended as each one lands, so a long batch fills the list as it goes
+      // instead of sitting blank until the end.
+      setRows((prev) => [...prev, ...saved.map(toRow)]);
+      setUnreviewedSnapshot((prev) => {
+        const next = new Set(prev);
+        for (const photo of saved) next.add(photo.id);
+        return next;
+      });
     }
 
     const parts = [];
     if (added.length) parts.push(`Added ${added.length} photo${added.length === 1 ? "" : "s"}.`);
-    if (failed.length) parts.push(`${failed.length} failed: ${failed[0]}`);
+    // Naming the count and what to do about it: a failed photo is simply not
+    // in the catalogue, so choosing those files again is all it takes.
+    if (failed.length) {
+      parts.push(
+        `${failed.length} failed after ${UPLOAD_ATTEMPTS} tries — pick those files again to retry. First: ${failed[0]}`
+      );
+    }
     setUploadStatus(parts.join(" ") || "Nothing uploaded.");
     setUploading(false);
   }
