@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import Image from "next/image";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { DISCIPLINES, type Discipline } from "@/lib/types";
@@ -532,6 +534,12 @@ function formatRaceDay(iso: string): string {
           )}
         </span>
         <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href="/admin/tag"
+            className="rounded-full bg-blue px-3.5 py-1.5 font-mono text-xs uppercase tracking-wide text-white transition-colors hover:bg-blue-hover"
+          >
+            Fast tagging
+          </Link>
           <label className="flex cursor-pointer items-center gap-1.5 rounded-full border border-ink/15 px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-muted">
             <input
               type="checkbox"
