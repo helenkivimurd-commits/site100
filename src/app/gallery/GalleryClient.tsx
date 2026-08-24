@@ -121,6 +121,20 @@ export default function GalleryClient({
         </div>
       </div>
 
+      {view.kind === "nobib" && view.disciplines.length > 1 && (
+        <div className="mx-auto flex max-w-7xl flex-wrap gap-2 px-5 pt-6 sm:px-8">
+          <AlbumChip href={albumHref(view.event)} active={!view.discipline} label="All" />
+          {view.disciplines.map((d) => (
+            <AlbumChip
+              key={d.name}
+              href={`${albumHref(view.event)}&discipline=${encodeURIComponent(d.name)}`}
+              active={view.discipline === d.name}
+              label={`${d.name} (${d.count})`}
+            />
+          ))}
+        </div>
+      )}
+
       <div className="mx-auto max-w-7xl px-5 py-10 sm:px-8">
         {view.kind === "events" || view.kind === "disciplines" ? (
           view.folders.length > 0 ? (
@@ -142,7 +156,10 @@ export default function GalleryClient({
         ) : filtered.maybes.length > 0 ? (
           <MaybeSection photos={filtered.maybes} bib={bib} soleResult />
         ) : bib.trim() ? (
-          <NothingFound event={scopeEvent} />
+          <NothingFound
+            event={scopeEvent}
+            noBibByEvent={view.kind === "search" ? view.noBibByEvent : []}
+          />
         ) : (
           <Empty title="No photos found" body="This album is empty." />
         )}
@@ -154,8 +171,15 @@ export default function GalleryClient({
 // What a runner sees when their number finds nothing. A dead end here is the
 // worst moment on the site — they came to find themselves — so it explains why
 // a search can come up empty and sends them somewhere rather than nowhere.
-function NothingFound({ event }: { event?: string }) {
-  const href = event ? `/gallery?event=${encodeURIComponent(event)}&nobib=1` : "/gallery?nobib=1";
+function NothingFound({
+  event,
+  noBibByEvent,
+}: {
+  event?: string;
+  noBibByEvent: { event: string; count: number }[];
+}) {
+  const albumHref = (name: string) => `/gallery?event=${encodeURIComponent(name)}&nobib=1`;
+
   return (
     <div className="mx-auto flex max-w-xl flex-col items-center gap-4 py-20 text-center">
       <p className="font-display text-3xl uppercase tracking-wide text-muted">No photos found</p>
@@ -164,16 +188,63 @@ function NothingFound({ event }: { event?: string }) {
         there isn&rsquo;t a photo of you. Scroll through the photos yourself, and see if you can
         find yourself &mdash; I hope you do!
       </p>
+
+      {noBibByEvent.length > 1 ? (
+        // Every event's album carries the same name, so the choice has to be
+        // made by race. They know which one they ran; the counts tell them what
+        // they are taking on before they start scrolling.
+        <>
+          <p className="mt-2 font-mono text-xs uppercase tracking-wide text-muted">
+            Which race were you in?
+          </p>
+          <div className="mt-1 flex w-full flex-col gap-2">
+            {noBibByEvent.map(({ event: name, count }) => (
+              <Link
+                key={name}
+                href={albumHref(name)}
+                className="flex items-center justify-between gap-4 rounded-md border border-ink/15 px-5 py-3.5 text-left transition-colors hover:border-ink hover:bg-card"
+              >
+                <span className="font-display text-lg uppercase tracking-wide">{name}</span>
+                <span className="shrink-0 font-mono text-xs text-muted">
+                  {count} photo{count === 1 ? "" : "s"}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </>
+      ) : noBibByEvent.length === 1 ? (
+        <Link
+          href={albumHref(noBibByEvent[0].event)}
+          className="mt-1 rounded-full bg-ink px-6 py-3 font-mono text-sm uppercase tracking-wide text-white transition-colors hover:bg-ink/85"
+        >
+          See photos with no visible bib
+        </Link>
+      ) : null}
+
       <Link
-        href={href}
-        className="mt-1 rounded-full bg-ink px-6 py-3 font-mono text-sm uppercase tracking-wide text-white transition-colors hover:bg-ink/85"
+        href={event ? `/gallery?event=${encodeURIComponent(event)}` : "/gallery"}
+        className="font-mono text-xs uppercase tracking-wide text-muted transition-colors hover:text-ink"
       >
-        See photos with no visible bib
-      </Link>
-      <Link href="/gallery" className="font-mono text-xs uppercase tracking-wide text-muted transition-colors hover:text-ink">
         or browse every event
       </Link>
     </div>
+  );
+}
+
+function albumHref(event?: string) {
+  return event ? `/gallery?event=${encodeURIComponent(event)}&nobib=1` : "/gallery?nobib=1";
+}
+
+function AlbumChip({ href, active, label }: { href: string; active: boolean; label: string }) {
+  return (
+    <Link
+      href={href}
+      className={`rounded-full border px-3.5 py-1.5 font-mono text-xs uppercase tracking-wide transition-colors ${
+        active ? "border-ink bg-ink text-white" : "border-ink/15 text-muted hover:border-ink hover:text-ink"
+      }`}
+    >
+      {label}
+    </Link>
   );
 }
 
@@ -203,7 +274,9 @@ function heading(view: BrowseView, shown: number, bib: string) {
     case "nobib":
       return {
         title: NO_BIB_ALBUM,
-        subtitle: bib.trim() ? `${plural(shown)} matching bib "${bib.trim()}"` : plural(shown),
+        subtitle: bib.trim()
+          ? `${plural(shown)} matching bib "${bib.trim()}"`
+          : `${plural(shown)}${view.discipline ? ` · ${view.discipline}` : ""}`,
       };
     case "empty":
       return { title: view.discipline ?? view.event ?? "Not found", subtitle: "" };

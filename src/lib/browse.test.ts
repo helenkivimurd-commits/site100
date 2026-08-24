@@ -144,3 +144,49 @@ test("the album can be opened across every event at once", () => {
   assert.equal(view.event, undefined);
   assert.deepEqual(view.photos.map((p) => p.id), ["c"]);
 });
+
+test("an empty search offers each event's unreadable photos separately", () => {
+  const catalogue = [
+    ...all,
+    { ...photo("h", "Sunset run", "Run"), reviewed: true },
+    { ...photo("i", "Ironman 70.3", "Swim"), reviewed: true },
+    { ...photo("j", "Ironman 70.3", "Bike"), reviewed: true },
+  ];
+  const view = browse(catalogue, { bib: "99999" });
+  assert.equal(view.kind, "search");
+  if (view.kind !== "search") return;
+  assert.deepEqual(view.photos, []);
+  // Two races, each counted on its own, biggest first — never one merged pile.
+  assert.deepEqual(view.noBibByEvent, [
+    { event: "Ironman 70.3", count: 2 },
+    { event: "Sunset run", count: 2 },
+  ]);
+});
+
+test("a search inside one event only offers that event", () => {
+  const catalogue = [...all, { ...photo("i", "Ironman 70.3", "Swim"), reviewed: true }];
+  const view = browse(catalogue, { event: "Ironman 70.3", bib: "99999" });
+  assert.equal(view.kind, "search");
+  if (view.kind !== "search") return;
+  assert.deepEqual(view.noBibByEvent, [{ event: "Ironman 70.3", count: 1 }]);
+});
+
+test("the album can be narrowed to one discipline", () => {
+  const catalogue = [
+    ...all,
+    { ...photo("i", "Ironman 70.3", "Swim"), reviewed: true },
+    { ...photo("j", "Ironman 70.3", "Bike"), reviewed: true },
+  ];
+  const whole = browse(catalogue, { event: "Ironman 70.3", noBib: true });
+  assert.equal(whole.kind, "nobib");
+  if (whole.kind !== "nobib") return;
+  assert.deepEqual(whole.photos.map((p) => p.id), ["i", "j"]);
+  assert.deepEqual(whole.disciplines, [{ name: "Bike", count: 1 }, { name: "Swim", count: 1 }]);
+
+  const justSwim = browse(catalogue, { event: "Ironman 70.3", noBib: true, discipline: "Swim" });
+  assert.equal(justSwim.kind, "nobib");
+  if (justSwim.kind !== "nobib") return;
+  assert.deepEqual(justSwim.photos.map((p) => p.id), ["i"]);
+  // The chips still list everything, so All and Bike remain reachable.
+  assert.equal(justSwim.disciplines.length, 2);
+});

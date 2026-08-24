@@ -30,6 +30,22 @@ export function hasNoVisibleBib(photo: Photo): boolean {
   return photo.reviewed && photo.bibs.length === 0;
 }
 
+// Which events hold unreadable photos, biggest first. Used to offer a runner
+// whose search came up empty a choice of race rather than one undifferentiated
+// heap — they know which one they ran.
+function noBibByEvent(photos: Photo[]): { event: string; count: number }[] {
+  const counts = new Map<string, number>();
+  for (const photo of photos) {
+    if (!hasNoVisibleBib(photo)) continue;
+    const name = (photo.event ?? "").trim();
+    if (!name) continue;
+    counts.set(name, (counts.get(name) ?? 0) + 1);
+  }
+  return [...counts.entries()]
+    .map(([event, count]) => ({ event, count }))
+    .sort((a, b) => b.count - a.count || a.event.localeCompare(b.event));
+}
+
 export type BrowseView =
   /** No event chosen: the list of events. */
   | { kind: "events"; folders: Folder[] }
@@ -41,14 +57,34 @@ export type BrowseView =
    * A bib typed at a level above the photos. Searches whatever is in scope:
    * everything at the top, or just the chosen event once inside one.
    */
-  | { kind: "search"; bib: string; event?: string; photos: Photo[]; maybes: Photo[] }
+  | {
+      kind: "search";
+      bib: string;
+      event?: string;
+      photos: Photo[];
+      maybes: Photo[];
+      /**
+       * Where the unreadable photos are, one entry per event. A search that
+       * found nothing offers these by name: every event's album is called the
+       * same thing, so sending someone to a combined pile of all of them would
+       * mean scrolling two races they were never in.
+       */
+      noBibByEvent: { event: string; count: number }[];
+    }
   /**
    * The gathered album of photos whose bib could not be read. Cuts across the
    * disciplines rather than replacing them: a run photo with an unreadable bib
    * is still in Run, and is here too, so that browsing Run misses nothing and
    * a runner who searched and found nothing has one place to look.
    */
-  | { kind: "nobib"; event?: string; photos: Photo[] }
+  | {
+      kind: "nobib";
+      event?: string;
+      discipline?: string;
+      photos: Photo[];
+      /** Disciplines present in this album, for narrowing it further. */
+      disciplines: { name: string; count: number }[];
+    }
   /** An event or discipline in the URL that no photo actually uses. */
   | { kind: "empty"; event?: string; discipline?: string };
 
@@ -105,7 +141,27 @@ export function browse(
   // from its own tile, and from the button offered when a search finds nothing.
   if (noBib) {
     const scope = event ? all.filter((p) => p.event === event) : all;
-    return { kind: "nobib", event, photos: scope.filter(hasNoVisibleBib) };
+    const unreadable = scope.filter(hasNoVisibleBib);
+
+    // An Ironman's worth of unreadable photos is a long scroll. Someone who
+    // only swam knows that, so the disciplines inside are offered as a filter.
+    const disciplines = [...new Map<string, number>(
+      unreadable.reduce((acc, p) => {
+        const name = (p.discipline ?? "").trim();
+        if (name) acc.set(name, (acc.get(name) ?? 0) + 1);
+        return acc;
+      }, new Map<string, number>())
+    ).entries()]
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count || a.name.localeCompare(b.name));
+
+    return {
+      kind: "nobib",
+      event,
+      discipline,
+      photos: discipline ? unreadable.filter((p) => p.discipline === discipline) : unreadable,
+      disciplines,
+    };
   }
 
   // A bib typed before any event is chosen searches the whole catalogue and
@@ -113,7 +169,7 @@ export function browse(
   // have to work out which event they were in first — and a runner who did two
   // races sees both without searching twice.
   if (query && !event) {
-    return { kind: "search", bib: query, ...splitByBib(all, query) };
+    return { kind: "search", bib: query, ...splitByBib(all, query), noBibByEvent: noBibByEvent(all) };
   }
 
   if (!event) return { kind: "events", folders: foldersBy(all, "event") };
@@ -124,7 +180,13 @@ export function browse(
   // Typed from inside an event but before an album: search that event only.
   // Once you have said which race you were in, the search respects it.
   if (query && !discipline) {
-    return { kind: "search", bib: query, event, ...splitByBib(inEvent, query) };
+    return {
+      kind: "search",
+      bib: query,
+      event,
+      ...splitByBib(inEvent, query),
+      noBibByEvent: noBibByEvent(inEvent),
+    };
   }
 
   if (!discipline) {
