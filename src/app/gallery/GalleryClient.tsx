@@ -160,9 +160,9 @@ function NothingFound({ event }: { event?: string }) {
     <div className="mx-auto flex max-w-xl flex-col items-center gap-4 py-20 text-center">
       <p className="font-display text-3xl uppercase tracking-wide text-muted">No photos found</p>
       <p className="text-sm leading-relaxed text-muted">
-        Due to the harsh weather on the race days, a lot of bibs got damaged so the numbers
-        can&rsquo;t be seen on the photo. That doesn&rsquo;t necessarily mean there isn&rsquo;t a
-        photo of you. Scroll through the photos yourself, and I hope that you could find yourself.
+        On some of the photos, the bibs aren&rsquo;t visible. That doesn&rsquo;t necessarily mean
+        there isn&rsquo;t a photo of you. Scroll through the photos yourself, and see if you can
+        find yourself &mdash; I hope you do!
       </p>
       <Link
         href={href}
