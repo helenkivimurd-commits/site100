@@ -47,7 +47,13 @@ async function visitLogs() {
 }
 
 const sha = (buf) => crypto.createHash("sha256").update(buf).digest("hex");
-const today = new Date().toISOString().slice(0, 10);
+// Named for the day in Estonia, so asking to restore "the 26th" means the 26th
+// as she lived it. The job runs at 03:30 local, which is the previous day in
+// UTC — naming folders by UTC would have filed each night's copy under
+// yesterday.
+const today = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "Europe/Tallinn", year: "numeric", month: "2-digit", day: "2-digit",
+}).format(new Date());
 
 const s3 = new S3Client({
   endpoint: process.env.B2_ENDPOINT,

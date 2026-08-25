@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { readEvents } from "@/lib/analytics";
+import { localDay, readEvents } from "@/lib/analytics";
 import { readJsonFile } from "@/lib/storage";
 import { ORDERS_FILE } from "@/lib/storage";
 
@@ -14,11 +14,7 @@ const DAYS = 30;
 // night is looking today, and would otherwise be filed under yesterday —
 // which matters exactly when it is being looked at: the evening after a race,
 // or the hours after something is posted on Instagram.
-const TZ = "Europe/Tallinn";
-const dayFormat = new Intl.DateTimeFormat("en-CA", {
-  timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
-});
-const day = (t: number) => dayFormat.format(new Date(t));
+const day = (t: number) => localDay(new Date(t));
 const pretty = (iso: string) =>
   new Date(`${iso}T00:00:00Z`).toLocaleDateString("en-GB", {
     weekday: "short", day: "numeric", month: "short", timeZone: "UTC",

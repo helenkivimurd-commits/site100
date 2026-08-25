@@ -39,6 +39,16 @@ export type VisitEvent = {
   v?: string;
 };
 
+// A day means a day in Estonia, everywhere: the chart, the visitor count, and
+// the salt that ties them together. Rotating the salt at UTC midnight while the
+// chart turned over at Estonian midnight would have counted one person as two
+// for the three hours in between.
+export const TZ = "Europe/Tallinn";
+const dayFormat = new Intl.DateTimeFormat("en-CA", {
+  timeZone: TZ, year: "numeric", month: "2-digit", day: "2-digit",
+});
+export const localDay = (d: Date = new Date()) => dayFormat.format(d);
+
 const monthFile = (d: Date) =>
   path.join(ANALYTICS_DIR, `visits-${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}.jsonl`);
 
@@ -56,7 +66,7 @@ const monthFile = (d: Date) =>
 let cached: { day: string; salt: string } | null = null;
 
 async function saltForToday(): Promise<string> {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = localDay();
   if (cached?.day === today) return cached.salt;
 
   const file = path.join(ANALYTICS_DIR, "salt");
