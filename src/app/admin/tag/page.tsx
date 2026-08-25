@@ -26,10 +26,21 @@ type Photo = {
 
 type Status = "idle" | "saving" | "saved" | "error";
 
+const MODE_LABELS: Record<string, "new" | "check"> = {
+  "Not tagged yet": "new",
+  "Check Google's guesses": "check",
+};
+const MODE_NAMES = Object.keys(MODE_LABELS);
+
 export default function TagPage() {
   const [photos, setPhotos] = useState<Photo[] | null>(null);
   const [index, setIndex] = useState(0);
-  const [value, setValue] = useState("");
+  // null means untouched: the box shows whatever the photo already says. Kept
+  // apart from the photo's own number so that clearing it stays cleared.
+  const [typed, setTyped] = useState<string | null>(null);
+  // Which pile to work through: photos with no number, or Google's guesses
+  // waiting to be confirmed.
+  const [mode, setMode] = useState<"new" | "check">("new");
   const [lastBibs, setLastBibs] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState("");
@@ -81,11 +92,11 @@ export default function TagPage() {
     return photos.filter(
       (p) =>
         !p.reviewed &&
-        p.bibs.length === 0 &&
+        (mode === "check" ? p.bibs.length > 0 : p.bibs.length === 0) &&
         (event === "All events" || p.event === event) &&
         (discipline === "All" || p.discipline === discipline)
     );
-  }, [photos, event, discipline]);
+  }, [photos, event, discipline, mode]);
 
   const byId = useMemo(() => new Map((photos ?? []).map((p) => [p.id, p])), [photos]);
 
@@ -100,6 +111,12 @@ export default function TagPage() {
   // What a photo already says, written the way she would type it.
   const asTyped = (p: Photo | undefined) =>
     p ? p.bibs.join(", ") + (p.alsoNoBib ? ", n" : "") : "";
+
+  // An untouched box starts with the number already on the photo whenever there
+  // is one to judge — a guess being checked, or a photo being looked back at.
+  // A blank photo starts empty.
+  const suggested = back > 0 || mode === "check" ? asTyped(current) : "";
+  const value = typed ?? suggested;
 
   // Written at the moment a photo is left, which is the only moment it is
   // certain — after a save the photo is gone from the queue, so nothing later
@@ -127,7 +144,7 @@ export default function TagPage() {
   // re-render after a save and wipe a number typed in the meantime.
   const showAnother = useCallback((move: (i: number) => number) => {
     setIndex(move);
-    setValue("");
+    setTyped(null);
     setZoom(false);
     setOrigin({ x: 50, y: 50 });
     setStatus("idle");
@@ -146,13 +163,13 @@ export default function TagPage() {
       const target = Math.max(0, Math.min(back + delta, trail.length));
       if (target === back) return false;
       setBack(target);
-      setValue(target === 0 ? "" : asTyped(photoAtBack(target)));
+      setTyped(null);
       setZoom(false);
       setOrigin({ x: 50, y: 50 });
       setStatus("idle");
       return true;
     },
-    [back, trail.length, photoAtBack]
+    [back, trail.length]
   );
 
   const save = useCallback(
@@ -201,7 +218,7 @@ export default function TagPage() {
       // stays honest.
       if (!current.reviewed) setDone((n) => n + 1);
       setStatus("saved");
-      setValue("");
+      setTyped(null);
       setZoom(false);
       setOrigin({ x: 50, y: 50 });
       if (back === 0) remember(current.id);
@@ -218,6 +235,17 @@ export default function TagPage() {
     function onKey(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
 
+      // The box arrives holding Google's guess. Typing a digit at all means
+      // disagreeing with it, so the first one replaces the guess instead of
+      // landing on the end of it — "370" and a typed 1 means 1, not 3701.
+      // After that the box is hers and digits append normally.
+      if (/^[0-9]$/.test(e.key) && typed === null && suggested) {
+        e.preventDefault();
+        setTyped(e.key);
+        inputRef.current?.focus();
+        return;
+      }
+
       // Typing a number has to work the moment a photo appears, without
       // clicking anything first. Clicking the photo to zoom, or touching one of
       // the pickers, moves the focus off the field — and then the digits went
@@ -227,13 +255,13 @@ export default function TagPage() {
       if (!inField) {
         if (/^[0-9]$/.test(e.key)) {
           e.preventDefault();
-          setValue((v) => v + e.key);
+          setTyped(value + e.key);
           inputRef.current?.focus();
           return;
         }
         if (e.key === "Backspace") {
           e.preventDefault();
-          setValue((v) => v.slice(0, -1));
+          setTyped(value.slice(0, -1));
           inputRef.current?.focus();
           return;
         }
@@ -254,7 +282,10 @@ export default function TagPage() {
         // Always swallowed, even with nothing to save, so focus never jumps out
         // of the box to somewhere the keyboard no longer reaches the number.
         e.preventDefault();
-        const line = value.trim() ? value : lastBibs;
+        // Only what she actually typed counts as hers; a guess sitting in the
+        // box is not an instruction to repeat it. Enter accepts the guess, Tab
+        // reaches for the last number — two keys, two meanings.
+        const line = typed?.trim() ? typed : lastBibs;
         if (line) save(line);
       } else if (e.key.toLowerCase() === "n") {
         // N always saves and always moves on, whatever has been typed. On an
@@ -266,9 +297,13 @@ export default function TagPage() {
         // pressing it twice really did do nothing, because the marker was
         // already there. One key, one meaning: this photo is done.
         e.preventDefault();
-        const digits = /[0-9]/.test(value);
-        const marked = /n/i.test(value);
-        save(digits ? (marked ? value : `${value.replace(/[, ]+$/, "")}, n`) : "n");
+        // Read from what she typed, not from the box: a guess showing there is
+        // exactly what N is rejecting, so N on an untouched guess means nobody
+        // readable is here and throws the guess away.
+        const line = typed ?? "";
+        const digits = /[0-9]/.test(line);
+        const marked = /n/i.test(line);
+        save(digits ? (marked ? line : `${line.replace(/[, ]+$/, "")}, n`) : "n");
       } else if (e.key === "ArrowLeft") {
         // Back through what has been seen, saved or skipped alike.
         e.preventDefault();
@@ -290,7 +325,17 @@ export default function TagPage() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [save, value, lastBibs, queue.length, showAnother, step, back, remember, current?.id]);
+  }, [
+    save, value, lastBibs, queue.length, showAnother, step, back, remember,
+    current?.id, typed, suggested,
+  ]);
+
+  const modeName = MODE_NAMES.find((n) => MODE_LABELS[n] === mode) ?? MODE_NAMES[0];
+  const setModeByName = (n: string) => {
+    remember(current?.id);
+    setMode(MODE_LABELS[n] ?? "new");
+    showAnother(() => 0);
+  };
 
   if (photos === null) {
     return <Shell><p className="font-mono text-sm text-muted">Loading photos…</p></Shell>;
@@ -300,10 +345,14 @@ export default function TagPage() {
     return (
       <Shell>
         <div className="text-center">
-          <p className="font-display text-3xl uppercase tracking-wide">Nothing left to tag</p>
+          <p className="font-display text-3xl uppercase tracking-wide">
+            {mode === "check" ? "Nothing left to check" : "Nothing left to tag"}
+          </p>
           <p className="mt-2 text-sm text-muted">
-            {done > 0 ? `${done} tagged in this session. ` : ""}
-            Every photo in this selection has a number or is marked as having none.
+            {done > 0 ? `${done} done in this session. ` : ""}
+            {mode === "check"
+              ? "Every guess in this selection has been confirmed or corrected."
+              : "Every photo in this selection has a number or is marked as having none. Switch the pile to check Google's guesses."}
           </p>
           {canGoBack && (
             <p className="mt-2 font-mono text-xs text-muted">
@@ -313,6 +362,7 @@ export default function TagPage() {
           <div className="mt-6 flex justify-center gap-3">
             <Picker label="Event" value={event} options={events} onChange={setEvent} />
             <Picker label="Album" value={discipline} options={disciplines} onChange={setDiscipline} />
+            <Picker label="Pile" value={modeName} options={MODE_NAMES} onChange={setModeByName} />
           </div>
           <Link href="/admin" className="mt-6 inline-block font-mono text-xs uppercase tracking-wide text-blue">
             Back to manage photos
@@ -328,11 +378,14 @@ export default function TagPage() {
         <div className="flex items-center gap-3">
           <Picker label="Event" value={event} options={events} onChange={(v) => { remember(current?.id); setEvent(v); showAnother(() => 0); }} />
           <Picker label="Album" value={discipline} options={disciplines} onChange={(v) => { remember(current?.id); setDiscipline(v); showAnother(() => 0); }} />
+          <Picker label="Pile" value={modeName} options={MODE_NAMES} onChange={setModeByName} />
         </div>
         <p className="font-mono text-xs text-muted">
           {back > 0
             ? `${back} back · ${current.title}`
-            : `${queue.length} left${done > 0 ? ` · ${done} done` : ""} · ${current.title}`}
+            : `${queue.length} ${mode === "check" ? "to check" : "left"}${
+                done > 0 ? ` · ${done} done` : ""
+              } · ${current.title}`}
         </p>
         <Link href="/admin" className="font-mono text-xs uppercase tracking-wide text-muted hover:text-ink">
           Manage photos
@@ -398,7 +451,7 @@ export default function TagPage() {
             // Digits, spaces and commas only. A letter in here could never be
             // part of a bib, and one sitting unnoticed in the field was enough
             // to make the shortcuts behave strangely.
-            onChange={(e) => setValue(e.target.value.replace(/[^0-9, nN]/g, ""))}
+            onChange={(e) => setTyped(e.target.value.replace(/[^0-9, nN]/g, ""))}
             inputMode="numeric"
             autoFocus
             onBlur={(e) => {
