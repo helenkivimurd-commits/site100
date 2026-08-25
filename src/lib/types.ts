@@ -22,6 +22,13 @@ export type StoredPhoto = {
   thumbHeight: number;
   bibs: string[];
   reviewed: boolean;
+  /**
+   * Someone else in this photo whose number could not be read. A photo can
+   * have a bib AND an unidentified runner — two people in frame, one number
+   * legible — and the second person has to be able to find themselves too, so
+   * the photo belongs in the unreadable album as well as under its number.
+   */
+  alsoNoBib?: boolean;
 };
 
 // What the rest of the app works with — StoredPhoto plus its id (the map

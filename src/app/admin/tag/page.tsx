@@ -111,19 +111,24 @@ export default function TagPage() {
   }, [index, event, discipline, current?.id]);
 
   const save = useCallback(
-    async (bibsText: string, noBib: boolean) => {
+    async (bibsText: string) => {
       if (!current) return;
-      const bibs = noBib
-        ? []
-        : bibsText.split(/[, ]+/).map((b) => b.trim()).filter(Boolean);
-      if (!noBib && bibs.length === 0) return; // nothing typed; ignore the keypress
+      // "1234, n" — that runner, plus somebody in the same photo whose number
+      // cannot be read. Both people have to be able to find the photo: one by
+      // typing their number, the other by looking through the unreadable album.
+      const marked = /n/i.test(bibsText);
+      const bibs = bibsText.split(/[^0-9]+/).filter(Boolean);
+      if (bibs.length === 0 && !marked) return; // nothing typed; ignore the keypress
+      // With no number at all the photo is in that album anyway, so the flag is
+      // only meaningful alongside one. Always sent, so retagging clears it.
+      const alsoNoBib = marked && bibs.length > 0;
 
       setStatus("saving");
       try {
         const res = await fetch("/api/photos", {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ id: current.id, bibs, reviewed: true }),
+          body: JSON.stringify({ id: current.id, bibs, reviewed: true, alsoNoBib }),
         });
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as { error?: string };
@@ -140,9 +145,13 @@ export default function TagPage() {
       // Kept locally too, so going back shows what was just decided rather than
       // the photo appearing untouched.
       setPhotos((prev) =>
-        prev ? prev.map((p) => (p.id === current.id ? { ...p, bibs, reviewed: true } : p)) : prev
+        prev
+          ? prev.map((p) =>
+              p.id === current.id ? { ...p, bibs, reviewed: true, alsoNoBib } : p
+            )
+          : prev
       );
-      if (!noBib) setLastBibs(bibs.join(", "));
+      if (bibs.length > 0) setLastBibs(bibs.join(", ") + (alsoNoBib ? ", n" : ""));
       setDone((n) => n + 1);
       setStatus("saved");
       setValue("");
@@ -181,18 +190,24 @@ export default function TagPage() {
 
       if (e.key === "Enter") {
         e.preventDefault();
-        save(value, false);
+        save(value);
       } else if (e.key === "Tab" && lastBibs) {
         // Same runner as the last photo — the commonest case by far.
         e.preventDefault();
-        save(lastBibs, false);
+        save(lastBibs);
       } else if (e.key.toLowerCase() === "n") {
-        // Whatever has been typed, N means there is no readable number. It used
-        // to be ignored unless the field was empty, which made it look broken:
-        // one stray character — including a previous "n" that had landed in the
-        // field as text — and the key stopped working with nothing to show why.
+        // On an empty field N means nobody here can be identified, and saves at
+        // once. After a number it means something different — that runner, and
+        // someone else who cannot be read — so it marks the line instead of
+        // saving, and Enter commits both. Saving immediately there would throw
+        // away the number just typed.
+        //
+        // It is never ignored and never types a literal "n" into the field. It
+        // used to work only on an empty field, so one stray character left the
+        // key dead with nothing on screen to explain why.
         e.preventDefault();
-        save("", true);
+        if (/[0-9]/.test(value)) setValue((v) => (/n/i.test(v) ? v : `${v.replace(/[, ]+$/, "")}, n`));
+        else save("n");
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
         showAnother((i) => Math.min(i + 1, Math.max(queue.length - 1, 0)));
@@ -294,7 +309,7 @@ export default function TagPage() {
             // Digits, spaces and commas only. A letter in here could never be
             // part of a bib, and one sitting unnoticed in the field was enough
             // to make the shortcuts behave strangely.
-            onChange={(e) => setValue(e.target.value.replace(/[^0-9, ]/g, ""))}
+            onChange={(e) => setValue(e.target.value.replace(/[^0-9, nN]/g, ""))}
             inputMode="numeric"
             autoFocus
             onBlur={(e) => {
@@ -316,7 +331,9 @@ export default function TagPage() {
           </span>
         </div>
         <p className="mx-auto mt-2 max-w-3xl font-mono text-[11px] uppercase tracking-wide text-muted">
-          Enter save &middot; Tab same as last{lastBibs ? ` (${lastBibs})` : ""} &middot; N no bib &middot; click to zoom there, move to look around
+          Enter save &middot; Tab same as last{lastBibs ? ` (${lastBibs})` : ""} &middot; N no bib
+          &middot; number then N = that runner + someone unreadable
+          &middot; click to zoom there, move to look around
           &middot; Z zoom &middot; &larr; &rarr; skip
         </p>
       </div>

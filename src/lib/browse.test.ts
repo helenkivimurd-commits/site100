@@ -207,3 +207,47 @@ test("the album can be narrowed to one discipline", () => {
   // The chips still list everything, so All and Bike remain reachable.
   assert.equal(justSwim.disciplines.length, 2);
 });
+
+// A photo of two runners where only one number is legible. The one who can be
+// read must still be findable by number, and the one who cannot has to turn up
+// in the unreadable album — otherwise tagging the photo hides them.
+const shared = { ...photo("g", "Sunset run", "Run", ["216"]), alsoNoBib: true } as Photo;
+const withShared = [...all, shared];
+
+test("a photo with a bib and an unreadable runner is in the unreadable album", () => {
+  const view = browse(withShared, { event: "Sunset run", noBib: true });
+  assert.equal(view.kind, "nobib");
+  if (view.kind !== "nobib") return;
+  assert.ok(view.photos.some((p) => p.id === "g"));
+});
+
+test("...and is still found by searching its number", () => {
+  const view = browse(withShared, { bib: "216" });
+  assert.equal(view.kind, "search");
+  if (view.kind !== "search") return;
+  assert.ok(view.photos.some((p) => p.id === "g"));
+});
+
+test("...and still sits in its own discipline folder", () => {
+  const view = browse(withShared, { event: "Sunset run", discipline: "Run" });
+  assert.equal(view.kind, "photos");
+  if (view.kind !== "photos") return;
+  assert.ok(view.photos.some((p) => p.id === "g"));
+});
+
+test("the unreadable album counts it alongside the truly unidentified", () => {
+  const view = browse(withShared, { event: "Sunset run" });
+  assert.equal(view.kind, "disciplines");
+  if (view.kind !== "disciplines") return;
+  const album = view.folders.find((f) => f.name === NO_BIB_ALBUM);
+  assert.ok(album);
+  assert.equal(album.count, 2); // the crowd photo, and the shared one
+});
+
+test("an unreviewed photo is never in the album, marked or not", () => {
+  const pending = { ...photo("h", "Sunset run", "Run"), reviewed: false } as Photo;
+  const view = browse([...withShared, pending], { event: "Sunset run", noBib: true });
+  assert.equal(view.kind, "nobib");
+  if (view.kind !== "nobib") return;
+  assert.ok(!view.photos.some((p) => p.id === "h"));
+});

@@ -27,7 +27,11 @@ export const NO_BIB_ALBUM = "No bib visible";
  * got to yet, which simply has no bib recorded so far.
  */
 export function hasNoVisibleBib(photo: Photo): boolean {
-  return photo.reviewed && photo.bibs.length === 0;
+  if (!photo.reviewed) return false;
+  // Nobody in the photo could be identified, or somebody in it could not be
+  // even though somebody else could. Either way there is a runner here who
+  // will never find themselves by typing a number.
+  return photo.bibs.length === 0 || photo.alsoNoBib === true;
 }
 
 // Which events hold unreadable photos, biggest first. Used to offer a runner

@@ -188,6 +188,7 @@ export async function PATCH(request: Request) {
     event?: string;
     bibs?: string[];
     reviewed?: boolean;
+    alsoNoBib?: boolean;
   };
   const { id } = body;
   if (!id) return NextResponse.json({ error: "id is required" }, { status: 400 });
@@ -209,6 +210,7 @@ export async function PATCH(request: Request) {
         bibs: body.bibs.map((b) => b.trim()).filter(Boolean),
       }),
       ...(body.reviewed !== undefined && { reviewed: body.reviewed }),
+      ...(body.alsoNoBib !== undefined && { alsoNoBib: body.alsoNoBib }),
     };
 
     await writeData(data);
