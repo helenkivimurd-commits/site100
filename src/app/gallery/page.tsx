@@ -36,7 +36,10 @@ export default async function GalleryPage({
       k: "search",
       q: bib.trim().slice(0, 12),
       n: view.kind === "search" ? view.photos.length : 0,
-      r: referrerName(h.get("referer"), h.get("host") ?? ""),
+      // Kept apart from n so a search that offered only vague suggestions can
+      // be told from one that turned up nothing whatsoever.
+      m: view.kind === "search" ? view.maybes.length : 0,
+      r: referrerName(h.get("referer"), (h.get("x-forwarded-host") ?? h.get("host") ?? "").split(":")[0]),
       v: await visitorHash(ip, h.get("user-agent") ?? ""),
     });
   }

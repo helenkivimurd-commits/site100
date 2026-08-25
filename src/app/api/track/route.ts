@@ -43,7 +43,12 @@ export async function POST(request: Request) {
 
   const forwarded = request.headers.get("x-forwarded-for");
   const ip = forwarded?.split(",")[0].trim() || request.headers.get("x-real-ip")?.trim() || "unknown";
-  const host = new URL(request.url).hostname;
+  // Behind the reverse proxy the request URL says 127.0.0.1, so the site did
+  // not recognise its own links and listed itself as a place traffic came from.
+  const host =
+    request.headers.get("x-forwarded-host")?.split(",")[0].trim() ||
+    request.headers.get("host")?.split(":")[0].trim() ||
+    "";
 
   await record({
     k: "view",

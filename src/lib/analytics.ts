@@ -33,6 +33,8 @@ export type VisitEvent = {
   q?: string;
   /** How many photos that search found. Zero is the interesting case. */
   n?: number;
+  /** How many "might be you" suggestions it offered instead. */
+  m?: number;
   /** Order total in cents, and how many photos. */
   c?: number;
   /** Stands in for a person, for one day only. */

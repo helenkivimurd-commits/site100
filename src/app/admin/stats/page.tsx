@@ -33,7 +33,9 @@ async function gather() {
 
   const views = events.filter((e) => e.k === "view");
   const searches = events.filter((e) => e.k === "search");
-  const failed = searches.filter((e) => (e.n ?? 0) === 0);
+  // Nothing at all, as against a search that at least offered suggestions.
+  const failed = searches.filter((e) => (e.n ?? 0) === 0 && (e.m ?? 0) === 0);
+  const vague = searches.filter((e) => (e.n ?? 0) === 0 && (e.m ?? 0) > 0);
 
   // A visitor is counted once a day, because that is as long as the thing
   // standing in for them lasts.
@@ -71,11 +73,11 @@ async function gather() {
   };
   const fromWhere = tally(views.map((e) => e.r ?? "direct"));
   const pages = tally(views.map((e) => e.p ?? "/"));
-  const missed = tally(failed.map((e) => e.q ?? "?"));
+  const missed = tally([...failed, ...vague].map((e) => e.q ?? "?"));
   const found = tally(searches.filter((e) => (e.n ?? 0) > 0).map((e) => e.q ?? "?"));
 
   return {
-    events, people, views, searches, failed, searchers,
+    events, people, views, searches, failed, vague, searchers,
     peopleOn, viewsOn, days, busiest,
     earned, sold, paidInWindow, fromWhere, pages, missed, found,
   };
@@ -83,7 +85,7 @@ async function gather() {
 
 export default async function StatsPage() {
   const {
-    events, people, views, searches, failed, searchers,
+    events, people, views, searches, failed, vague, searchers,
     peopleOn, viewsOn, days, busiest,
     earned, sold, paidInWindow, fromWhere, pages, missed, found,
   } = await gather();
@@ -103,7 +105,12 @@ export default async function StatsPage() {
       <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Figure label="People" value={people} note={`${views.length} pages opened`} />
         <Figure label="Searched a bib" value={searchers} note={`${searches.length} searches`} />
-        <Figure label="Found nothing" value={failed.length} note={`of ${searches.length} searches`} warn={failed.length > 0} />
+        <Figure
+          label="Found nothing"
+          value={failed.length + vague.length}
+          note={vague.length > 0 ? `${vague.length} saw only "might be you"` : `of ${searches.length} searches`}
+          warn={failed.length + vague.length > 0}
+        />
         <Figure label="Sold" value={`€${(earned / 100).toFixed(2)}`} note={`${sold} photo${sold === 1 ? "" : "s"}, ${paidInWindow.length} order${paidInWindow.length === 1 ? "" : "s"}`} />
       </div>
 

@@ -81,3 +81,25 @@ test("isSubsequence", () => {
   assert.equal(isSubsequence("2037", "207"), false);
   assert.equal(isSubsequence("", "2037"), true);
 });
+
+// Found in the live visit log: someone searched "0105" for a photo tagged
+// "105" and was shown a vague suggestion instead of their own photo.
+test("a leading zero is the same runner, either way round", () => {
+  assert.equal(matchBibs("0105", ["105"])?.kind, "exact");
+  assert.equal(matchBibs("105", ["0105"])?.kind, "exact");
+  assert.equal(matchBibs("0105", ["0105"])?.kind, "exact");
+  assert.equal(matchBibs("0082", ["82"])?.kind, "exact");
+});
+
+test("the photo still shows the number as it was tagged", () => {
+  assert.equal(matchBibs("105", ["0105"])?.tag, "0105");
+});
+
+test("zero on its own is left alone", () => {
+  assert.equal(matchBibs("0", ["0"])?.kind, "exact");
+});
+
+test("a real difference is still a real difference", () => {
+  assert.equal(matchBibs("1050", ["105"])?.kind, "partial");
+  assert.equal(matchBibs("105", ["106"]), null);
+});

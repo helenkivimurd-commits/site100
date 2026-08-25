@@ -21,6 +21,19 @@ export function normaliseBib(bib: string): string {
 }
 
 /**
+ * Race numbers are printed with leading zeros — a bib reading "0105" is runner
+ * 105 — and which form gets typed depends on whether you copied the bib or
+ * remembered the number. They are the same runner, so they must compare equal.
+ *
+ * This was found in the visit log: someone searched "0105", the photo was
+ * tagged "105", and the site offered it only as a vague "might be you" instead
+ * of their photo.
+ */
+export function canonicalBib(bib: string): string {
+  return /^\d+$/.test(bib) ? bib.replace(/^0+(?=\d)/, "") : bib;
+}
+
+/**
  * True when every character of `fragment` appears in `full`, in order, though
  * not necessarily next to each other — i.e. `fragment` is what is left of
  * `full` once some characters are hidden.
@@ -67,28 +80,31 @@ export type BibMatch =
  * and a contiguous run beats one broken by a covered digit.
  */
 export function matchBibs(query: string, tags: string[]): BibMatch | null {
-  const q = normaliseBib(query);
+  const q = canonicalBib(normaliseBib(query));
   if (!q) return null;
 
   let best: BibMatch | null = null;
   const rank = (m: BibMatch) => (m.kind === "exact" ? 3 : m.kind === "contains" ? 2 : 1);
 
   for (const raw of tags) {
-    const tag = normaliseBib(raw);
+    // `shown` keeps the number as she typed it, so a photo tagged "0105" still
+    // says so on screen; `tag` is the form used for comparing.
+    const shown = normaliseBib(raw);
+    const tag = canonicalBib(shown);
     if (!tag) continue;
 
     let candidate: BibMatch | null = null;
 
     if (tag === q) {
-      candidate = { kind: "exact", tag };
+      candidate = { kind: "exact", tag: shown };
     } else if (tag.includes(q)) {
-      candidate = { kind: "contains", tag };
+      candidate = { kind: "contains", tag: shown };
     } else if (
       tag.length < q.length &&
       tag.length >= minimumVisible(q.length) &&
       isSubsequence(tag, q)
     ) {
-      candidate = { kind: "partial", tag, visible: tag.length, contiguous: q.includes(tag) };
+      candidate = { kind: "partial", tag: shown, visible: tag.length, contiguous: q.includes(tag) };
     }
 
     if (!candidate) continue;
