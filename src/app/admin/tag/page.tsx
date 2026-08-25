@@ -247,18 +247,18 @@ export default function TagPage() {
         e.preventDefault();
         save(lastBibs);
       } else if (e.key.toLowerCase() === "n") {
-        // On an empty field N means nobody here can be identified, and saves at
-        // once. After a number it means something different — that runner, and
-        // someone else who cannot be read — so it marks the line instead of
-        // saving, and Enter commits both. Saving immediately there would throw
-        // away the number just typed.
+        // N always saves and always moves on, whatever has been typed. On an
+        // empty field it means nobody here can be identified; after a number it
+        // means that runner plus somebody who cannot be read.
         //
-        // It is never ignored and never types a literal "n" into the field. It
-        // used to work only on an empty field, so one stray character left the
-        // key dead with nothing on screen to explain why.
+        // It used to only mark the line after a number and wait for Enter, so
+        // pressing it appeared to do nothing — the photo stayed put — and
+        // pressing it twice really did do nothing, because the marker was
+        // already there. One key, one meaning: this photo is done.
         e.preventDefault();
-        if (/[0-9]/.test(value)) setValue((v) => (/n/i.test(v) ? v : `${v.replace(/[, ]+$/, "")}, n`));
-        else save("n");
+        const digits = /[0-9]/.test(value);
+        const marked = /n/i.test(value);
+        save(digits ? (marked ? value : `${value.replace(/[, ]+$/, "")}, n`) : "n");
       } else if (e.key === "ArrowLeft") {
         // Back through what has been seen, saved or skipped alike.
         e.preventDefault();
@@ -410,8 +410,8 @@ export default function TagPage() {
           </span>
         </div>
         <p className="mx-auto mt-2 max-w-3xl font-mono text-[11px] uppercase tracking-wide text-muted">
-          Enter save &middot; Tab same as last{lastBibs ? ` (${lastBibs})` : ""} &middot; N no bib
-          &middot; number then N = that runner + someone unreadable
+          Enter save &middot; Tab same as last{lastBibs ? ` (${lastBibs})` : ""} &middot; N saves
+          with no bib &middot; a number then N saves that runner + someone unreadable
           <br />
           &larr; back{canGoBack ? "" : " (nothing yet)"} &middot; &rarr; forward
           {back > 0 ? " · Esc return to the queue" : " (skip)"} &middot; click to zoom there, move to
