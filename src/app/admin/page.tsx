@@ -61,10 +61,21 @@ const UPLOAD_ATTEMPTS = 3;
 
 const FALLBACK_EVENT = "IRONMAN 70.3 Tallinn European Championship";
 
+// Stands for "every one of them" in the open folder, so a whole event — or the
+// whole library — can be listed without picking an album.
+const EVERY = "\u0000every";
+
 export default function AdminPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "unreviewed">("all");
+  // Which folder is open. null means the folders themselves are showing; EVERY
+  // means "don't narrow by this", so one event's whole set — or the entire
+  // library — is reachable without picking through albums.
+  const [folder, setFolder] = useState<{ event: string | null; discipline: string | null }>({
+    event: null,
+    discipline: null,
+  });
 
   // Ids that were still untagged when "Unreviewed only" was switched on.
   // Filtering against this frozen set (rather than the live `reviewed` flag)
@@ -138,11 +149,41 @@ function formatRaceDay(iso: string): string {
     };
   }, []);
 
-  const visible = useMemo(
-    () => (filter === "all" ? rows : rows.filter((r) => unreviewedSnapshot.has(r.id))),
-    [rows, filter, unreviewedSnapshot]
+  const inFolder = useMemo(
+    () =>
+      rows.filter(
+        (r) =>
+          (folder.event === EVERY || r.event === folder.event) &&
+          (folder.discipline === EVERY || r.discipline === folder.discipline)
+      ),
+    [rows, folder]
   );
-  const reviewedCount = rows.filter((r) => r.reviewed).length;
+
+  const visible = useMemo(
+    () => (filter === "all" ? inFolder : inFolder.filter((r) => unreviewedSnapshot.has(r.id))),
+    [inFolder, filter, unreviewedSnapshot]
+  );
+
+  // What the folder screen shows: one tile per event, or per album inside one.
+  const folders = useMemo(() => {
+    const scope = folder.event === null ? rows : rows.filter((r) => r.event === folder.event);
+    const key = (r: Row) => (folder.event === null ? r.event : r.discipline);
+    const counts = new Map<string, { total: number; left: number }>();
+    for (const r of scope) {
+      const name = (key(r) ?? "").trim();
+      if (!name) continue;
+      const c = counts.get(name) ?? { total: 0, left: 0 };
+      c.total += 1;
+      if (!r.reviewed) c.left += 1;
+      counts.set(name, c);
+    }
+    return [...counts.entries()]
+      .map(([name, c]) => ({ name, ...c }))
+      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+  }, [rows, folder.event]);
+
+  const showingFolders = folder.event === null || folder.discipline === null;
+  const reviewedCount = inFolder.filter((r) => r.reviewed).length;
   const stillUntagged = visible.filter((r) => !r.reviewed).length;
 
   // One request per photo rather than one for the whole selection. A batch of
@@ -236,6 +277,10 @@ function formatRaceDay(iso: string): string {
       // Appended as each one lands, so a long batch fills the list as it goes
       // instead of sitting blank until the end.
       setRows((prev) => [...prev, ...saved.map(toRow)]);
+      // Open the event just uploaded to. Otherwise a batch of a few thousand
+      // lands somewhere off screen while a different folder is still open, and
+      // it looks as though nothing arrived.
+      setFolder({ event: event, discipline: EVERY });
       setUnreviewedSnapshot((prev) => {
         const next = new Set(prev);
         for (const photo of saved) next.add(photo.id);
@@ -523,9 +568,82 @@ function formatRaceDay(iso: string): string {
         )}
       </div>
 
-      <div className="mt-8 flex items-center justify-between gap-4 border-y border-card py-3">
+      <nav className="mt-8 flex flex-wrap items-center gap-2 font-mono text-xs uppercase tracking-wide">
+        <button
+          onClick={() => setFolder({ event: null, discipline: null })}
+          className={folder.event === null ? "text-ink" : "text-muted hover:text-ink"}
+        >
+          All events
+        </button>
+        {folder.event !== null && (
+          <>
+            <span className="text-muted">/</span>
+            <button
+              onClick={() => setFolder({ event: folder.event, discipline: null })}
+              className={folder.discipline === null ? "text-ink" : "text-muted hover:text-ink"}
+            >
+              {folder.event === EVERY ? "Every photo" : folder.event}
+            </button>
+          </>
+        )}
+        {folder.discipline !== null && folder.event !== EVERY && (
+          <>
+            <span className="text-muted">/</span>
+            <span className="text-ink">
+              {folder.discipline === EVERY ? "Every album" : folder.discipline}
+            </span>
+          </>
+        )}
+      </nav>
+
+      {showingFolders ? (
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {folders.map((f) => (
+            <button
+              key={f.name}
+              aria-label={`Open ${f.name}, ${f.total} photos`}
+              onClick={() =>
+                setFolder(
+                  folder.event === null
+                    ? { event: f.name, discipline: null }
+                    : { event: folder.event, discipline: f.name }
+                )
+              }
+              className="rounded-md border border-card px-4 py-3 text-left transition-colors hover:border-ink"
+            >
+              <p className="font-display text-lg uppercase tracking-wide">{f.name}</p>
+              <p className="mt-0.5 font-mono text-xs text-muted">
+                {f.total} photo{f.total === 1 ? "" : "s"}
+                {f.left > 0 ? ` · ${f.left} still to tag` : ""}
+              </p>
+            </button>
+          ))}
+          <button
+            aria-label={folder.event === null ? "Open every photo" : "Open every album"}
+            onClick={() =>
+              setFolder(
+                folder.event === null
+                  ? { event: EVERY, discipline: EVERY }
+                  : { event: folder.event, discipline: EVERY }
+              )
+            }
+            className="rounded-md border border-dashed border-ink/25 px-4 py-3 text-left text-muted transition-colors hover:border-ink hover:text-ink"
+          >
+            <p className="font-display text-lg uppercase tracking-wide">
+              {folder.event === null ? "Every photo" : "Every album"}
+            </p>
+            <p className="mt-0.5 font-mono text-xs">
+              {folder.event === null
+                ? `all ${rows.length} in one list`
+                : `all ${folders.reduce((n, f) => n + f.total, 0)} in this event`}
+            </p>
+          </button>
+        </div>
+      ) : (
+      <>
+      <div className="mt-4 flex items-center justify-between gap-4 border-y border-card py-3">
         <span className="font-mono text-sm text-muted">
-          {reviewedCount} / {rows.length} reviewed
+          {reviewedCount} / {inFolder.length} reviewed
           {filter === "unreviewed" && (
             <span className="text-ink">
               {" "}
@@ -759,6 +877,8 @@ function formatRaceDay(iso: string): string {
           </li>
         ))}
       </ul>
+      </>
+      )}
 
       {inspecting !== null && visible[inspecting] && (
         <PhotoInspector
