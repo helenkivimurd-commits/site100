@@ -1,0 +1,28 @@
+[Unit]
+Description=Copy the catalogue and orders to Backblaze
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=hkp
+WorkingDirectory=/srv/hkp/site
+ExecStart=/usr/bin/node --env-file=.env.local scripts/backup-data.mjs
+
+# The photos in the bucket can always be downloaded again. The two files copied
+# here cannot be rebuilt from anything: they hold every bib number typed by hand
+# and the record of what people bought.
+Nice=19
+IOSchedulingClass=idle
+
+# Same hardening as the rest. This unit only ever reads the data directory —
+# it writes to Backblaze, not to disk — so nothing here needs to be writable.
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+NoNewPrivileges=true
+
+TimeoutStartSec=15min
+
+[Install]
+WantedBy=multi-user.target
