@@ -242,10 +242,20 @@ export default function TagPage() {
       if (e.key === "Enter") {
         e.preventDefault();
         save(value);
-      } else if (e.key === "Tab" && lastBibs) {
-        // Same runner as the last photo — the commonest case by far.
+      } else if (e.key === "Tab") {
+        // Save and move on, like Enter. Whatever is typed wins; an empty box
+        // repeats the last number, which is the common case of one runner
+        // across several frames.
+        //
+        // It used to always save the previous number, so typing one and then
+        // pressing Tab quietly filed the photo under the runner before — the
+        // wrong person, with nothing on screen to say so.
+        //
+        // Always swallowed, even with nothing to save, so focus never jumps out
+        // of the box to somewhere the keyboard no longer reaches the number.
         e.preventDefault();
-        save(lastBibs);
+        const line = value.trim() ? value : lastBibs;
+        if (line) save(line);
       } else if (e.key.toLowerCase() === "n") {
         // N always saves and always moves on, whatever has been typed. On an
         // empty field it means nobody here can be identified; after a number it
@@ -410,8 +420,9 @@ export default function TagPage() {
           </span>
         </div>
         <p className="mx-auto mt-2 max-w-3xl font-mono text-[11px] uppercase tracking-wide text-muted">
-          Enter save &middot; Tab same as last{lastBibs ? ` (${lastBibs})` : ""} &middot; N saves
-          with no bib &middot; a number then N saves that runner + someone unreadable
+          Enter or Tab saves &middot; Tab on an empty box repeats the last
+          {lastBibs ? ` (${lastBibs})` : ""} &middot; N saves with no bib &middot; a number then N
+          saves that runner + someone unreadable
           <br />
           &larr; back{canGoBack ? "" : " (nothing yet)"} &middot; &rarr; forward
           {back > 0 ? " · Esc return to the queue" : " (skip)"} &middot; click to zoom there, move to
