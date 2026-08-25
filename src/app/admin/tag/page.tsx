@@ -21,6 +21,7 @@ type Photo = {
   discipline: string;
   bibs: string[];
   reviewed: boolean;
+  alsoNoBib?: boolean;
 };
 
 type Status = "idle" | "saving" | "saved" | "error";
@@ -41,6 +42,13 @@ export default function TagPage() {
   // top — neither is in the middle of the picture.
   const [origin, setOrigin] = useState({ x: 50, y: 50 });
   const [done, setDone] = useState(0);
+  // Every photo shown, oldest first, so going back is possible at all. Once a
+  // photo is saved it leaves the queue, so stepping the queue index backwards
+  // reaches the ones skipped and never the ones decided — which are exactly the
+  // ones worth a second look when a number was mistyped.
+  const [trail, setTrail] = useState<string[]>([]);
+  // How far back she is looking. 0 is the photo waiting to be tagged.
+  const [back, setBack] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -79,7 +87,27 @@ export default function TagPage() {
     );
   }, [photos, event, discipline]);
 
-  const current = queue[index];
+  const byId = useMemo(() => new Map((photos ?? []).map((p) => [p.id, p])), [photos]);
+
+  const photoAtBack = useCallback(
+    (b: number) => (b === 0 ? queue[index] : byId.get(trail[trail.length - b] ?? "")),
+    [queue, index, byId, trail]
+  );
+
+  const current = photoAtBack(back);
+  const canGoBack = back < trail.length;
+
+  // What a photo already says, written the way she would type it.
+  const asTyped = (p: Photo | undefined) =>
+    p ? p.bibs.join(", ") + (p.alsoNoBib ? ", n" : "") : "";
+
+  // Written at the moment a photo is left, which is the only moment it is
+  // certain — after a save the photo is gone from the queue, so nothing later
+  // can tell that it was ever on screen.
+  const remember = useCallback((id: string | undefined) => {
+    if (!id) return;
+    setTrail((t) => (t[t.length - 1] === id ? t : [...t, id].slice(-40)));
+  }, []);
 
   // The next several are fetched before they are needed. That both fills the
   // browser\'s cache and, more importantly, warms the server\'s: the first view
@@ -109,6 +137,23 @@ export default function TagPage() {
   useEffect(() => {
     inputRef.current?.focus();
   }, [index, event, discipline, current?.id]);
+
+  // Moving through what has already been seen. Going back fills the field with
+  // whatever that photo says now, so a wrong number is visible and can be typed
+  // over rather than guessed at.
+  const step = useCallback(
+    (delta: number) => {
+      const target = Math.max(0, Math.min(back + delta, trail.length));
+      if (target === back) return false;
+      setBack(target);
+      setValue(target === 0 ? "" : asTyped(photoAtBack(target)));
+      setZoom(false);
+      setOrigin({ x: 50, y: 50 });
+      setStatus("idle");
+      return true;
+    },
+    [back, trail.length, photoAtBack]
+  );
 
   const save = useCallback(
     async (bibsText: string) => {
@@ -152,15 +197,21 @@ export default function TagPage() {
           : prev
       );
       if (bibs.length > 0) setLastBibs(bibs.join(", ") + (alsoNoBib ? ", n" : ""));
-      setDone((n) => n + 1);
+      // A photo already decided is being corrected, not tagged, so the count
+      // stays honest.
+      if (!current.reviewed) setDone((n) => n + 1);
       setStatus("saved");
       setValue("");
       setZoom(false);
       setOrigin({ x: 50, y: 50 });
+      if (back === 0) remember(current.id);
+      // Correcting an old photo returns to the one waiting, so fixing something
+      // spotted in passing costs nothing but the correction itself.
+      setBack(0);
       // The photo leaves the queue as soon as it is saved, so the one that was
       // next slides into this position and the index stays put.
     },
-    [current]
+    [current, back, remember]
   );
 
   useEffect(() => {
@@ -208,12 +259,20 @@ export default function TagPage() {
         e.preventDefault();
         if (/[0-9]/.test(value)) setValue((v) => (/n/i.test(v) ? v : `${v.replace(/[, ]+$/, "")}, n`));
         else save("n");
+      } else if (e.key === "ArrowLeft") {
+        // Back through what has been seen, saved or skipped alike.
+        e.preventDefault();
+        step(1);
       } else if (e.key === "ArrowRight") {
         e.preventDefault();
-        showAnother((i) => Math.min(i + 1, Math.max(queue.length - 1, 0)));
-      } else if (e.key === "ArrowLeft") {
+        // Forward out of the past first; at the front it skips this photo.
+        if (!step(-1)) {
+          remember(current?.id);
+          showAnother((i) => Math.min(i + 1, Math.max(queue.length - 1, 0)));
+        }
+      } else if (e.key === "Escape" && back > 0) {
         e.preventDefault();
-        showAnother((i) => Math.max(i - 1, 0));
+        step(-back);
       } else if (e.key.toLowerCase() === "z") {
         e.preventDefault();
         setZoom((z) => !z);
@@ -221,7 +280,7 @@ export default function TagPage() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [save, value, lastBibs, queue.length, showAnother]);
+  }, [save, value, lastBibs, queue.length, showAnother, step, back, remember, current?.id]);
 
   if (photos === null) {
     return <Shell><p className="font-mono text-sm text-muted">Loading photos…</p></Shell>;
@@ -236,6 +295,11 @@ export default function TagPage() {
             {done > 0 ? `${done} tagged in this session. ` : ""}
             Every photo in this selection has a number or is marked as having none.
           </p>
+          {canGoBack && (
+            <p className="mt-2 font-mono text-xs text-muted">
+              Press &larr; to look back over the ones just done.
+            </p>
+          )}
           <div className="mt-6 flex justify-center gap-3">
             <Picker label="Event" value={event} options={events} onChange={setEvent} />
             <Picker label="Album" value={discipline} options={disciplines} onChange={setDiscipline} />
@@ -252,18 +316,33 @@ export default function TagPage() {
     <div className="flex h-[calc(100vh-73px)] flex-col sm:h-[calc(100vh-81px)]">
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-card px-5 py-2.5 sm:px-8">
         <div className="flex items-center gap-3">
-          <Picker label="Event" value={event} options={events} onChange={(v) => { setEvent(v); showAnother(() => 0); }} />
-          <Picker label="Album" value={discipline} options={disciplines} onChange={(v) => { setDiscipline(v); showAnother(() => 0); }} />
+          <Picker label="Event" value={event} options={events} onChange={(v) => { remember(current?.id); setEvent(v); showAnother(() => 0); }} />
+          <Picker label="Album" value={discipline} options={disciplines} onChange={(v) => { remember(current?.id); setDiscipline(v); showAnother(() => 0); }} />
         </div>
         <p className="font-mono text-xs text-muted">
-          {queue.length} left{done > 0 ? ` · ${done} done` : ""} · {current.title}
+          {back > 0
+            ? `${back} back · ${current.title}`
+            : `${queue.length} left${done > 0 ? ` · ${done} done` : ""} · ${current.title}`}
         </p>
         <Link href="/admin" className="font-mono text-xs uppercase tracking-wide text-muted hover:text-ink">
           Manage photos
         </Link>
       </div>
 
-      <div className="relative flex-1 overflow-hidden bg-ink/95">
+      <div
+        className={`relative flex-1 overflow-hidden bg-ink/95 ${
+          // Looking at the past has to be obvious at a glance, or a correction
+          // gets typed into the wrong photo.
+          back > 0 ? "ring-4 ring-inset ring-blue" : ""
+        }`}
+      >
+        {back > 0 && (
+          <p className="absolute left-1/2 top-3 z-10 -translate-x-1/2 rounded-full bg-blue px-4 py-1.5 font-mono text-xs uppercase tracking-wide text-white">
+            {back} photo{back === 1 ? "" : "s"} back
+            {current.reviewed ? ` · saved as ${asTyped(current) || "no bib"}` : " · not tagged yet"}
+            {" · "}&rarr; forward
+          </p>
+        )}
         {/* A plain img: this is an API-rendered original, and next/image would
             only re-encode something the route has already sized. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -333,8 +412,10 @@ export default function TagPage() {
         <p className="mx-auto mt-2 max-w-3xl font-mono text-[11px] uppercase tracking-wide text-muted">
           Enter save &middot; Tab same as last{lastBibs ? ` (${lastBibs})` : ""} &middot; N no bib
           &middot; number then N = that runner + someone unreadable
-          &middot; click to zoom there, move to look around
-          &middot; Z zoom &middot; &larr; &rarr; skip
+          <br />
+          &larr; back{canGoBack ? "" : " (nothing yet)"} &middot; &rarr; forward
+          {back > 0 ? " · Esc return to the queue" : " (skip)"} &middot; click to zoom there, move to
+          look around &middot; Z zoom
         </p>
       </div>
     </div>
