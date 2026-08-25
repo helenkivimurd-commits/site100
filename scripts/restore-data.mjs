@@ -18,10 +18,19 @@ import {
 } from "@aws-sdk/client-s3";
 
 const PREFIX = "backups/";
+const CATALOGUE = process.env.CATALOGUE_FILE ?? "src/data/photos.json";
+const VISITS_DIR = process.env.ANALYTICS_DIR ?? path.join(path.dirname(CATALOGUE), "visits");
 const TARGETS = {
-  "photos.json": process.env.CATALOGUE_FILE ?? "src/data/photos.json",
+  "photos.json": CATALOGUE,
   "orders.json": process.env.ORDERS_FILE ?? "src/data/orders.json",
 };
+
+// Visit logs are named "visits/<month>.jsonl" in the bucket and go back into the
+// visits directory. They are lines rather than one object, and losing a day of
+// them costs a number on a chart rather than anyone's work, so they are put back
+// plainly without the comparison the other two get.
+const isLog = (name) => name.startsWith("visits/") && name.endsWith(".jsonl");
+const logTarget = (name) => path.join(VISITS_DIR, path.basename(name));
 
 const day = process.argv[2];
 const inPlace = process.argv.includes("--in-place");
@@ -45,8 +54,10 @@ do {
 
 const days = new Map();
 for (const o of objects) {
-  const [d, name] = o.Key.slice(PREFIX.length).split("/");
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(d ?? "")) continue;
+  const rest = o.Key.slice(PREFIX.length);
+  const d = rest.split("/")[0];
+  const name = rest.slice(d.length + 1);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(d ?? "") || !name) continue;
   if (!days.has(d)) days.set(d, []);
   days.get(d).push({ name, size: o.Size, Key: o.Key });
 }
@@ -76,7 +87,7 @@ if (!files) {
 // same day, which is a worse place to be than either of them alone.
 const planned = [];
 for (const f of files) {
-  const target = TARGETS[f.name];
+  const target = isLog(f.name) ? logTarget(f.name) : TARGETS[f.name];
   if (!target) {
     console.log(`  ${f.name}: not a file this script knows how to place, skipped`);
     continue;
@@ -86,14 +97,22 @@ for (const f of files) {
 
   // Whatever comes out of the bucket is checked before it is allowed to stand
   // in for the real thing.
-  let stored;
+  let stored, count;
   try {
-    stored = JSON.parse(body.toString("utf-8"));
+    if (isLog(f.name)) {
+      const lines = body.toString("utf-8").split("\n").filter(Boolean);
+      lines.forEach((l) => JSON.parse(l));
+      stored = null;
+      count = lines.length;
+    } else {
+      stored = JSON.parse(body.toString("utf-8"));
+      count = Object.keys(stored).length;
+    }
   } catch {
-    console.error(`  ${f.name}: the stored copy is not valid JSON — stopping`);
+    console.error(`  ${f.name}: the stored copy is not valid — stopping`);
     process.exit(1);
   }
-  planned.push({ name: f.name, target, body, stored, count: Object.keys(stored).length });
+  planned.push({ name: f.name, target, body, stored, count, log: isLog(f.name) });
 }
 
 // An in-place restore undoes everything done since that backup was taken. That
@@ -102,6 +121,7 @@ for (const f of files) {
 if (inPlace && !process.argv.includes("--yes")) {
   let blocked = false;
   for (const p of planned) {
+    if (p.log) continue;
     let live;
     try {
       live = JSON.parse(await fs.readFile(p.target, "utf-8"));
@@ -131,10 +151,11 @@ if (inPlace && !process.argv.includes("--yes")) {
 }
 
 for (const p of planned) {
+  if (p.log) await fs.mkdir(path.dirname(p.target), { recursive: true });
   if (!inPlace) {
     const beside = `${p.target}.from-${day}`;
     await fs.writeFile(beside, p.body);
-    console.log(`  ${p.name}: ${p.count} entries written to ${beside} (nothing replaced)`);
+    console.log(`  ${p.name}: ${p.count} ${p.log ? "events" : "entries"} written to ${beside} (nothing replaced)`);
     continue;
   }
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
@@ -149,7 +170,7 @@ for (const p of planned) {
   const tmp = `${p.target}.tmp-restore`;
   await fs.writeFile(tmp, p.body);
   await fs.rename(tmp, p.target);
-  console.log(`  ${p.name}: ${p.count} entries restored into ${p.target}`);
+  console.log(`  ${p.name}: ${p.count} ${p.log ? "events" : "entries"} restored into ${p.target}`);
 }
 
 if (inPlace) console.log("\nRestart the site so it reads the restored file:  systemctl restart hkp");

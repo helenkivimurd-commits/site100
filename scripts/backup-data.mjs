@@ -24,10 +24,27 @@ import {
 const KEEP_DAYS = Number(process.env.BACKUP_KEEP_DAYS ?? 30);
 const PREFIX = "backups/";
 
-const FILES = [
-  process.env.CATALOGUE_FILE ?? "src/data/photos.json",
-  process.env.ORDERS_FILE ?? "src/data/orders.json",
-];
+const CATALOGUE = process.env.CATALOGUE_FILE ?? "src/data/photos.json";
+const ORDERS = process.env.ORDERS_FILE ?? "src/data/orders.json";
+const VISITS_DIR = process.env.ANALYTICS_DIR ?? path.join(path.dirname(CATALOGUE), "visits");
+
+// Whole JSON files, checked by parsing them.
+const FILES = [CATALOGUE, ORDERS];
+
+// The visit log is one file per month of newline-separated events. The salt is
+// deliberately NOT copied: it is destroyed and replaced every night so that
+// past visitor hashes can never be turned back into people. Storing it beside
+// the events it scrambled would hand back exactly what throwing it away
+// protects — so if this is ever restored, the counts come back and the
+// anonymity stays intact.
+async function visitLogs() {
+  try {
+    const names = await fs.readdir(VISITS_DIR);
+    return names.filter((n) => n.endsWith(".jsonl")).map((n) => path.join(VISITS_DIR, n));
+  } catch {
+    return [];
+  }
+}
 
 const sha = (buf) => crypto.createHash("sha256").update(buf).digest("hex");
 const today = new Date().toISOString().slice(0, 10);
@@ -45,8 +62,11 @@ if (!Bucket) {
 
 let failed = false;
 
-for (const file of FILES) {
-  const name = path.basename(file);
+const logs = await visitLogs();
+
+for (const file of [...FILES, ...logs]) {
+  const isLog = logs.includes(file);
+  const name = isLog ? `visits/${path.basename(file)}` : path.basename(file);
   let body;
   try {
     body = await fs.readFile(file);
@@ -60,9 +80,16 @@ for (const file of FILES) {
   // Never store a file that has stopped being readable. A backup of rubbish
   // looks like a backup right up until the day it is needed.
   try {
-    JSON.parse(body.toString("utf-8"));
+    if (isLog) {
+      // One event per line. A crash can leave the last line half written, and
+      // that costs that line rather than the month.
+      const lines = body.toString("utf-8").split("\n").filter(Boolean);
+      for (const line of lines.slice(0, -1)) JSON.parse(line);
+    } else {
+      JSON.parse(body.toString("utf-8"));
+    }
   } catch {
-    console.error(`  ${name}: NOT VALID JSON — refusing to store it`);
+    console.error(`  ${name}: NOT VALID — refusing to store it`);
     failed = true;
     continue;
   }

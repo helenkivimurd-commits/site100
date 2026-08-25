@@ -42,36 +42,49 @@ export type VisitEvent = {
 const monthFile = (d: Date) =>
   path.join(ANALYTICS_DIR, `visits-${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}.jsonl`);
 
-// A random value made once and kept on disk. Without it the daily salt would
-// reset on every restart and one visitor would be counted several times.
-let saltCache: string | null = null;
-async function siteSalt(): Promise<string> {
-  if (saltCache) return saltCache;
+// The salt is thrown away and replaced every day, and only ever one exists.
+//
+// This is the part that makes yesterday's numbers safe to keep. Mixing the date
+// into a permanent salt is not enough: anyone holding that permanent value could
+// take a stored hash and try all four billion addresses against it until one
+// matched, on any past day. Once the salt that made a hash no longer exists
+// anywhere, that hash cannot be turned back into a person by anyone, including
+// us — so the visit log is genuinely anonymous rather than merely obscured.
+//
+// The cost is that the day boundary is when counting resets, which is what a
+// daily visitor count means anyway.
+let cached: { day: string; salt: string } | null = null;
+
+async function saltForToday(): Promise<string> {
+  const today = new Date().toISOString().slice(0, 10);
+  if (cached?.day === today) return cached.salt;
+
   const file = path.join(ANALYTICS_DIR, "salt");
+  await fs.mkdir(ANALYTICS_DIR, { recursive: true });
+
   try {
-    saltCache = (await fs.readFile(file, "utf-8")).trim();
-    if (saltCache) return saltCache;
+    const [day, salt] = (await fs.readFile(file, "utf-8")).trim().split(":");
+    if (day === today && salt) {
+      cached = { day, salt };
+      return salt;
+    }
   } catch {
     // not made yet
   }
-  const made = crypto.randomBytes(32).toString("hex");
-  await fs.mkdir(ANALYTICS_DIR, { recursive: true });
-  // wx: if another request won the race, use theirs rather than overwriting and
-  // splitting today's visitors across two salts.
-  try {
-    await fs.writeFile(file, made, { flag: "wx", mode: 0o600 });
-    saltCache = made;
-  } catch {
-    saltCache = (await fs.readFile(file, "utf-8")).trim();
-  }
-  return saltCache;
+
+  // A new day: overwrite, so the value that made yesterday's hashes is gone.
+  const salt = crypto.randomBytes(32).toString("hex");
+  const tmp = `${file}.tmp`;
+  await fs.writeFile(tmp, `${today}:${salt}`, { mode: 0o600 });
+  await fs.rename(tmp, file);
+  cached = { day: today, salt };
+  return salt;
 }
 
-/** Who this is, as far as today is concerned. Tomorrow it is someone else. */
+/** Who this is, as far as today is concerned. Tomorrow it is nobody. */
 export async function visitorHash(ip: string, userAgent: string): Promise<string> {
-  const day = new Date().toISOString().slice(0, 10);
-  const salt = await siteSalt();
-  return crypto.createHash("sha256").update(`${salt}:${day}:${ip}:${userAgent}`).digest("hex").slice(0, 12);
+  const salt = await saltForToday();
+  return crypto.createHash("sha256").update(`${salt}:${ip}:${userAgent}`).digest("hex").slice(0, 12);
 }
 
 /** Reduce a referrer to the site that sent them, or nothing. */
