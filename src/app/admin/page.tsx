@@ -569,6 +569,24 @@ function formatRaceDay(iso: string): string {
       </div>
 
       <nav className="mt-8 flex flex-wrap items-center gap-2 font-mono text-xs uppercase tracking-wide">
+        {/* These two live on the breadcrumb rather than in the list's toolbar,
+            because the toolbar only exists once a folder is open — which left
+            the tagging screen and the visitor figures unreachable from the page
+            everyone lands on. */}
+        <span className="order-last ml-auto flex items-center gap-2">
+          <Link
+            href="/admin/stats"
+            className="rounded-full border border-ink/15 px-3.5 py-1.5 text-muted transition-colors hover:text-ink"
+          >
+            Visitors
+          </Link>
+          <Link
+            href="/admin/tag"
+            className="rounded-full bg-blue px-3.5 py-1.5 text-white transition-colors hover:bg-blue-hover"
+          >
+            Fast tagging
+          </Link>
+        </span>
         <button
           onClick={() => setFolder({ event: null, discipline: null })}
           className={folder.event === null ? "text-ink" : "text-muted hover:text-ink"}
@@ -652,18 +670,6 @@ function formatRaceDay(iso: string): string {
           )}
         </span>
         <div className="flex shrink-0 items-center gap-2">
-          <Link
-            href="/admin/stats"
-            className="rounded-full border border-ink/15 px-3.5 py-1.5 font-mono text-xs uppercase tracking-wide text-muted transition-colors hover:text-ink"
-          >
-            Visitors
-          </Link>
-          <Link
-            href="/admin/tag"
-            className="rounded-full bg-blue px-3.5 py-1.5 font-mono text-xs uppercase tracking-wide text-white transition-colors hover:bg-blue-hover"
-          >
-            Fast tagging
-          </Link>
           <label className="flex cursor-pointer items-center gap-1.5 rounded-full border border-ink/15 px-3 py-1.5 font-mono text-xs uppercase tracking-wide text-muted">
             <input
               type="checkbox"
