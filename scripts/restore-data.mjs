@@ -71,6 +71,10 @@ if (!files) {
   process.exit(1);
 }
 
+// Everything is fetched and judged before anything is written. Restoring one
+// file and then refusing the next would leave the two disagreeing about the
+// same day, which is a worse place to be than either of them alone.
+const planned = [];
 for (const f of files) {
   const target = TARGETS[f.name];
   if (!target) {
@@ -82,68 +86,70 @@ for (const f of files) {
 
   // Whatever comes out of the bucket is checked before it is allowed to stand
   // in for the real thing.
-  let count = "?";
+  let stored;
   try {
-    count = Object.keys(JSON.parse(body.toString("utf-8"))).length;
+    stored = JSON.parse(body.toString("utf-8"));
   } catch {
     console.error(`  ${f.name}: the stored copy is not valid JSON — stopping`);
     process.exit(1);
   }
+  planned.push({ name: f.name, target, body, stored, count: Object.keys(stored).length });
+}
 
-  // An in-place restore undoes everything done since that backup was taken.
-  // That is the whole point when the file is ruined, and a disaster when it is
-  // merely a day old — so say exactly what would be lost, and do not act on a
-  // day's copy that is quieter than what is already there without being told
-  // twice.
-  if (inPlace && !process.argv.includes("--yes")) {
+// An in-place restore undoes everything done since that backup was taken. That
+// is the whole point when the file is ruined, and a disaster when it is merely
+// a day old — so say exactly what would be lost, and stop.
+if (inPlace && !process.argv.includes("--yes")) {
+  let blocked = false;
+  for (const p of planned) {
     let live;
     try {
-      live = JSON.parse(await fs.readFile(target, "utf-8"));
+      live = JSON.parse(await fs.readFile(p.target, "utf-8"));
     } catch {
-      live = null;
+      continue; // nothing there to lose
     }
-    if (live) {
-      const stored = JSON.parse(body.toString("utf-8"));
-      const changed = Object.keys(live).filter(
-        (k) => JSON.stringify(live[k]) !== JSON.stringify(stored[k])
-      );
-      const gone = Object.keys(live).filter((k) => !(k in stored));
-      if (changed.length || gone.length) {
-        console.error(`\n  ${f.name}: this would undo work.`);
-        console.error(`    ${changed.length} entr(ies) differ from the copy on disk`);
-        if (gone.length) console.error(`    ${gone.length} would disappear entirely`);
-        for (const k of changed.slice(0, 10)) {
-          const title = live[k]?.title ?? k;
-          console.error(`      ${title}: now ${JSON.stringify(live[k])}`);
-          console.error(`      ${" ".repeat(title.length)}  back to ${JSON.stringify(stored[k])}`);
-        }
-        if (changed.length > 10) console.error(`      ... and ${changed.length - 10} more`);
-        console.error(`\n    Add --yes if that is really what you want.`);
-        process.exit(1);
-      }
+    const changed = Object.keys(live).filter(
+      (k) => JSON.stringify(live[k]) !== JSON.stringify(p.stored[k])
+    );
+    const gone = Object.keys(live).filter((k) => !(k in p.stored));
+    if (!changed.length && !gone.length) continue;
+    blocked = true;
+    console.error(`\n  ${p.name}: this would undo work.`);
+    console.error(`    ${changed.length} entr(ies) differ from the copy on disk`);
+    if (gone.length) console.error(`    ${gone.length} would disappear entirely`);
+    for (const k of changed.slice(0, 10)) {
+      const title = live[k]?.title ?? k;
+      console.error(`      ${title}: now      ${JSON.stringify(live[k])}`);
+      console.error(`      ${" ".repeat(title.length)}  back to ${JSON.stringify(p.stored[k])}`);
     }
+    if (changed.length > 10) console.error(`      ... and ${changed.length - 10} more`);
   }
+  if (blocked) {
+    console.error(`\n    Nothing was changed. Add --yes if that is really what you want.`);
+    process.exit(1);
+  }
+}
 
+for (const p of planned) {
   if (!inPlace) {
-    const beside = `${target}.from-${day}`;
-    await fs.writeFile(beside, body);
-    console.log(`  ${f.name}: ${count} entries written to ${beside} (nothing replaced)`);
+    const beside = `${p.target}.from-${day}`;
+    await fs.writeFile(beside, p.body);
+    console.log(`  ${p.name}: ${p.count} entries written to ${beside} (nothing replaced)`);
     continue;
   }
-
   const stamp = new Date().toISOString().replace(/[:.]/g, "-");
-  const saved = `${target}.replaced-${stamp}`;
+  const saved = `${p.target}.replaced-${stamp}`;
   try {
-    await fs.copyFile(target, saved);
-    console.log(`  ${f.name}: what was there is kept as ${path.basename(saved)}`);
+    await fs.copyFile(p.target, saved);
+    console.log(`  ${p.name}: what was there is kept as ${path.basename(saved)}`);
   } catch (err) {
     if (err.code !== "ENOENT") throw err;
   }
   // Written whole and swapped in, so the app never reads a half-written file.
-  const tmp = `${target}.tmp-restore`;
-  await fs.writeFile(tmp, body);
-  await fs.rename(tmp, target);
-  console.log(`  ${f.name}: ${count} entries restored into ${target}`);
+  const tmp = `${p.target}.tmp-restore`;
+  await fs.writeFile(tmp, p.body);
+  await fs.rename(tmp, p.target);
+  console.log(`  ${p.name}: ${p.count} entries restored into ${p.target}`);
 }
 
 if (inPlace) console.log("\nRestart the site so it reads the restored file:  systemctl restart hkp");
