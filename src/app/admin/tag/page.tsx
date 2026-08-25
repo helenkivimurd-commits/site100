@@ -35,6 +35,11 @@ export default function TagPage() {
   const [event, setEvent] = useState("All events");
   const [discipline, setDiscipline] = useState("All");
   const [zoom, setZoom] = useState(false);
+  // Where the zoom is centred, as a percentage across the photo. Zooming always
+  // from the middle was useless for the frames that need it most: a bib on a
+  // race belt sits low and off to one side, and a helmet number is up near the
+  // top — neither is in the middle of the picture.
+  const [origin, setOrigin] = useState({ x: 50, y: 50 });
   const [done, setDone] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -96,6 +101,7 @@ export default function TagPage() {
     setIndex(move);
     setValue("");
     setZoom(false);
+    setOrigin({ x: 50, y: 50 });
     setStatus("idle");
   }, []);
 
@@ -141,6 +147,7 @@ export default function TagPage() {
       setStatus("saved");
       setValue("");
       setZoom(false);
+      setOrigin({ x: 50, y: 50 });
       // The photo leaves the queue as soon as it is saved, so the one that was
       // next slides into this position and the index stays put.
     },
@@ -252,12 +259,29 @@ export default function TagPage() {
           // which is what a helmet sticker needs.
           src={`/api/photos/original?id=${encodeURIComponent(current.id)}&size=${zoom ? "full" : "view"}`}
           alt=""
-          onClick={() => {
+          onClick={(e) => {
+            const box = e.currentTarget.getBoundingClientRect();
+            setOrigin({
+              x: ((e.clientX - box.left) / box.width) * 100,
+              y: ((e.clientY - box.top) / box.height) * 100,
+            });
             setZoom((z) => !z);
             inputRef.current?.focus();
           }}
-          className={`h-full w-full transition-transform duration-150 ${
-            zoom ? "scale-[2.5] cursor-zoom-out object-contain" : "cursor-zoom-in object-contain"
+          onMouseMove={(e) => {
+            // Once zoomed, the mouse drags the view around like a magnifier,
+            // so a number near an edge can be reached without zooming out and
+            // clicking again.
+            if (!zoom) return;
+            const box = e.currentTarget.getBoundingClientRect();
+            setOrigin({
+              x: ((e.clientX - box.left) / box.width) * 100,
+              y: ((e.clientY - box.top) / box.height) * 100,
+            });
+          }}
+          style={{ transformOrigin: `${origin.x}% ${origin.y}%` }}
+          className={`h-full w-full object-contain ${
+            zoom ? "scale-[3] cursor-zoom-out" : "cursor-zoom-in transition-transform duration-150"
           }`}
         />
       </div>
@@ -292,8 +316,8 @@ export default function TagPage() {
           </span>
         </div>
         <p className="mx-auto mt-2 max-w-3xl font-mono text-[11px] uppercase tracking-wide text-muted">
-          Enter save &middot; Tab same as last{lastBibs ? ` (${lastBibs})` : ""} &middot; N no bib &middot; Z zoom
-          &middot; &larr; &rarr; skip
+          Enter save &middot; Tab same as last{lastBibs ? ` (${lastBibs})` : ""} &middot; N no bib &middot; click to zoom there, move to look around
+          &middot; Z zoom &middot; &larr; &rarr; skip
         </p>
       </div>
     </div>
