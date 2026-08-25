@@ -36,6 +36,13 @@ export const ORDERS_FILE = process.env.ORDERS_FILE
   ? path.resolve(process.env.ORDERS_FILE)
   : path.join(process.cwd(), ".data", "orders.json");
 
+// Where the visit log lives — one file per month, so it stays small enough to
+// read whole and old months can simply be deleted. Sits beside the catalogue
+// rather than in the repo, for the same reason.
+export const ANALYTICS_DIR = process.env.ANALYTICS_DIR
+  ? path.resolve(process.env.ANALYTICS_DIR)
+  : path.join(path.dirname(CATALOGUE_FILE), "visits");
+
 function isMissing(err: unknown): boolean {
   return (err as NodeJS.ErrnoException)?.code === "ENOENT";
 }

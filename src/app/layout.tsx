@@ -4,6 +4,7 @@ import "./globals.css";
 import { CartProvider } from "@/components/CartProvider";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import VisitBeacon from "./VisitBeacon";
 
 const bigShoulders = Big_Shoulders({
   variable: "--font-big-shoulders",
@@ -49,6 +50,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col bg-page text-ink">
         <CartProvider>
           <Header />
+          <VisitBeacon />
           <main className="flex-1">{children}</main>
           <Footer />
         </CartProvider>

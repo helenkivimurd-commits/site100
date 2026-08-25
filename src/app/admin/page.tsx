@@ -653,6 +653,12 @@ function formatRaceDay(iso: string): string {
         </span>
         <div className="flex shrink-0 items-center gap-2">
           <Link
+            href="/admin/stats"
+            className="rounded-full border border-ink/15 px-3.5 py-1.5 font-mono text-xs uppercase tracking-wide text-muted transition-colors hover:text-ink"
+          >
+            Visitors
+          </Link>
+          <Link
             href="/admin/tag"
             className="rounded-full bg-blue px-3.5 py-1.5 font-mono text-xs uppercase tracking-wide text-white transition-colors hover:bg-blue-hover"
           >
