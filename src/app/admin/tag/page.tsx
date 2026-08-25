@@ -76,14 +76,16 @@ export default function TagPage() {
 
   const current = queue[index];
 
-  // The next few are fetched before they are needed, so pressing Enter does not
-  // land on a blank screen while the original downloads.
+  // The next several are fetched before they are needed. That both fills the
+  // browser\'s cache and, more importantly, warms the server\'s: the first view
+  // of a photo costs a fetch from the bucket and a resize, and doing that in
+  // advance is the difference between waiting seconds and waiting none.
   useEffect(() => {
-    for (let i = 1; i <= 3; i++) {
+    for (let i = 1; i <= 6; i++) {
       const next = queue[index + i];
       if (!next) break;
       const img = new Image();
-      img.src = `/api/photos/original?id=${encodeURIComponent(next.id)}`;
+      img.src = `/api/photos/original?id=${encodeURIComponent(next.id)}&size=view`;
     }
   }, [queue, index]);
 
@@ -244,8 +246,11 @@ export default function TagPage() {
             only re-encode something the route has already sized. */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          key={current.id}
-          src={`/api/photos/original?id=${encodeURIComponent(current.id)}`}
+          key={`${current.id}-${zoom ? "full" : "view"}`}
+          // Small by default because most bibs read perfectly at that size and
+          // it arrives in a fraction of the time; zoom swaps in the full one,
+          // which is what a helmet sticker needs.
+          src={`/api/photos/original?id=${encodeURIComponent(current.id)}&size=${zoom ? "full" : "view"}`}
           alt=""
           onClick={() => {
             setZoom((z) => !z);
