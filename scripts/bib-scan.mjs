@@ -24,11 +24,16 @@ import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
 //     upload read the same catalogue and each save a copy without the other's
 //     photo in it.
 //
-// Accuracy, measured against 60 photos tagged by hand (scripts/bib-ocr-eval.mjs):
-// at these thresholds, 48% of photos get a correct bib, 7% get a wrong one, and
-// 47% are left blank. A wrong number is a nuisance — the buyer sees the photo
-// before paying — but it is still work to undo, which is why the thresholds are
-// set where they are rather than to catch as many as possible.
+// Two engines. Google Cloud Vision is used when a key is configured, and
+// tesseract otherwise. On the same 50 Ironman bike photos, measured against
+// numbers confirmed by hand:
+//
+//   tesseract  0% correct
+//   Vision    82% correct, 2% wrong, 16% left blank
+//
+// Tesseract simply cannot see a helmet sticker forty pixels wide; no amount of
+// contrast or thresholding recovers detail the camera never captured. It stays
+// as the fallback for a machine with no key, and because it costs nothing.
 
 const run = promisify(execFile);
 
@@ -50,6 +55,22 @@ const MIN_CONFIDENCE = Number(process.env.BIB_MIN_CONFIDENCE ?? 80);
 const MIN_DIGITS = Number(process.env.BIB_MIN_DIGITS ?? 3);
 const MIN_PASSES = Number(process.env.BIB_MIN_PASSES ?? 2);
 const MAX_BIBS_PER_PHOTO = 4;
+
+const VISION_KEY = process.env.GOOGLE_VISION_API_KEY;
+
+// The rule that came out of the measurement. Vision reads the rider's number
+// and usually something else as well — a hoarding, another competitor, a decal
+// — so what matters is choosing between them.
+//
+//   everything it read              94% correct, 26% wrong
+//   near the middle, 3-4 digits     82% correct,  2% wrong
+//
+// The rider is the subject of the photograph and sits centrally; the noise is
+// out at the edges. Requiring three digits loses the handful of two-digit bibs,
+// but those turn into blanks rather than into somebody else's number.
+const VISION_MAX_OFF_CENTRE = Number(process.env.VISION_MAX_OFF_CENTRE ?? 0.45);
+const VISION_MIN_DIGITS = Number(process.env.VISION_MIN_DIGITS ?? 3);
+const VISION_SEND_WIDTH = 2500;
 
 // DRY_RUN=1 reads and reports but saves nothing, and forgets nothing — useful
 // for checking what a threshold change would do before letting it loose.
@@ -129,6 +150,63 @@ async function readBibs(source) {
     .map((c) => c.text);
 }
 
+async function readBibsWithVision(source) {
+  const jpeg = await sharp(source)
+    .rotate()
+    .resize({ width: VISION_SEND_WIDTH, withoutEnlargement: true })
+    .jpeg({ quality: 90 })
+    .toBuffer();
+
+  const res = await fetch(`https://vision.googleapis.com/v1/images:annotate?key=${VISION_KEY}`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      requests: [
+        {
+          image: { content: jpeg.toString("base64") },
+          features: [{ type: "TEXT_DETECTION" }],
+          imageContext: { languageHints: ["en"] },
+        },
+      ],
+    }),
+  });
+  if (!res.ok) throw new Error(`vision ${res.status}: ${(await res.text()).slice(0, 120)}`);
+  const json = await res.json();
+  const err = json.responses?.[0]?.error;
+  if (err) throw new Error(err.message ?? "vision error");
+
+  const width = json.responses?.[0]?.fullTextAnnotation?.pages?.[0]?.width ?? VISION_SEND_WIDTH;
+  // The first annotation is the whole block of text; the rest are the pieces.
+  const words = (json.responses?.[0]?.textAnnotations ?? []).slice(1);
+
+  const found = new Map();
+  for (const w of words) {
+    const vertices = w.boundingPoly?.vertices ?? [];
+    const xs = vertices.map((v) => v.x ?? 0);
+    const ys = vertices.map((v) => v.y ?? 0);
+    const height = ys.length ? Math.max(...ys) - Math.min(...ys) : 0;
+    const cx = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : width / 2;
+    const offCentre = Math.abs(cx - width / 2) / (width / 2);
+
+    // A number can arrive glued to something else ("845GIRO"); take the digits.
+    for (const run of (w.description ?? "").split(/\D+/)) {
+      if (!/^\d{2,4}$/.test(run)) continue;
+      const prev = found.get(run);
+      if (!prev || prev.height < height) found.set(run, { height, offCentre });
+    }
+  }
+
+  const candidates = [...found.entries()]
+    .map(([text, v]) => ({ text, ...v }))
+    .filter((c) => c.offCentre < VISION_MAX_OFF_CENTRE && c.text.length >= VISION_MIN_DIGITS)
+    .sort((a, b) => b.height - a.height);
+
+  // One number per photo. Taking the runner-up as well doubled the wrong ones
+  // for three more points of right ones — a bad trade when a wrong number sends
+  // a runner to a photograph of a stranger.
+  return candidates.slice(0, 1).map((c) => c.text);
+}
+
 function authHeader() {
   const password = process.env.ADMIN_PASSWORD;
   if (!password) throw new Error("ADMIN_PASSWORD is not set — cannot save results.");
@@ -197,7 +275,11 @@ async function main() {
       .map(([id]) => id)
       .slice(0, BATCH);
 
-    console.log(`${DRY_RUN ? "DRY RUN — nothing will be saved\n" : ""}catalogue ${Object.keys(catalogue).length}, already scanned ${seen.size}, to scan now ${todo.length}`);
+    console.log(
+      `${DRY_RUN ? "DRY RUN — nothing will be saved\n" : ""}` +
+        `engine ${VISION_KEY ? "Google Vision" : "tesseract"}, ` +
+        `catalogue ${Object.keys(catalogue).length}, already scanned ${seen.size}, to scan now ${todo.length}`
+    );
     if (todo.length === 0) return;
 
     const s3 = s3Client();
@@ -229,7 +311,8 @@ async function main() {
           if (!key) { seen.add(id); blank++; continue; }
 
           const obj = await s3.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
-          const bibs = await readBibs(Buffer.from(await obj.Body.transformToByteArray()));
+          const source = Buffer.from(await obj.Body.transformToByteArray());
+          const bibs = VISION_KEY ? await readBibsWithVision(source) : await readBibs(source);
 
           if (bibs.length) {
             // Re-read immediately before saving: the photographer may have

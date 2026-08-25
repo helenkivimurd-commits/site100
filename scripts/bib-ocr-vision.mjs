@@ -58,20 +58,36 @@ async function readWithVision(jpeg, feature) {
 
   // Every separate piece of text it found, reduced to the ones shaped like a
   // bib. The first annotation is the whole block, so it is skipped.
+  const width = json.responses?.[0]?.fullTextAnnotation?.pages?.[0]?.width ?? SEND_WIDTH;
   const words = (json.responses?.[0]?.textAnnotations ?? []).slice(1);
-  const out = [];
+  const out = new Map();
   for (const w of words) {
     const text = (w.description ?? "").trim();
+    const ys = (w.boundingPoly?.vertices ?? []).map((v) => v.y ?? 0);
+    const xs = (w.boundingPoly?.vertices ?? []).map((v) => v.x ?? 0);
+    const height = ys.length ? Math.max(...ys) - Math.min(...ys) : 0;
+    // How far from the middle of the frame, 0 at the centre and 1 at an edge.
+    // The rider is the subject and sits centrally; hoardings and other
+    // competitors are pushed out to the sides.
+    const cx = xs.length ? (Math.min(...xs) + Math.max(...xs)) / 2 : width / 2;
+    const offCentre = Math.abs(cx - width / 2) / (width / 2);
     // A number may arrive glued to something else ("845GIRO"); pull the digits.
     for (const run of text.split(/\D+/)) {
-      if (/^\d{2,4}$/.test(run)) out.push(run);
+      if (!/^\d{2,4}$/.test(run)) continue;
+      // Keep the largest sighting of each number.
+      const prev = out.get(run);
+      if (!prev || prev.height < height) out.set(run, { height, offCentre });
     }
   }
-  return [...new Set(out)];
+  return [...out.entries()]
+    .map(([text, v]) => ({ text, ...v }))
+    .sort((a, b) => b.height - a.height);
 }
 
 function dropPartials(found) {
-  return found.filter((a) => !found.some((b) => b !== a && b.length > a.length && b.includes(a)));
+  return found.filter(
+    (a) => !found.some((b) => b !== a && b.text.length > a.text.length && b.text.includes(a.text))
+  );
 }
 
 const catalogue = JSON.parse(await fs.readFile(CATALOGUE, "utf-8"));
@@ -134,22 +150,39 @@ await Promise.all(
 );
 
 console.log("");
+// Vision usually reads the bib AND something else in the frame — another
+// rider's number, a hoarding, a wheel decal. Taking everything it says gives a
+// high hit rate and a lot of noise, so what matters is how to choose.
+const STRATEGIES = [
+  { name: "everything it read", pick: (c) => c },
+  { name: "the biggest number only", pick: (c) => c.slice(0, 1) },
+  { name: "only what is near the middle", pick: (c) => c.filter((x) => x.offCentre < 0.45) },
+  { name: "biggest of those near the middle", pick: (c) => c.filter((x) => x.offCentre < 0.45).slice(0, 1) },
+  { name: "near middle, 3-4 digits", pick: (c) => c.filter((x) => x.offCentre < 0.45 && x.text.length >= 3) },
+  { name: "near middle, 3-4 digits, biggest", pick: (c) => c.filter((x) => x.offCentre < 0.45 && x.text.length >= 3).slice(0, 1) },
+];
+
 for (const feature of features) {
-  let hit = 0, wrong = 0, blank = 0;
-  for (const r of results) {
-    const kept = (r[feature] ?? []).filter((t) => t.length >= 2);
-    if (!kept.length) { blank++; continue; }
-    if (kept.some((k) => r.truth.includes(k))) hit++;
-    if (kept.some((k) => !r.truth.includes(k))) wrong++;
+  console.log(feature);
+  console.log("   choice                              correct   wrong   blank");
+  for (const strat of STRATEGIES) {
+    let hit = 0, wrong = 0, blank = 0;
+    for (const r of results) {
+      const kept = strat.pick(r[feature] ?? []).map((c) => c.text);
+      if (!kept.length) { blank++; continue; }
+      if (kept.some((k) => r.truth.includes(k))) hit++;
+      if (kept.some((k) => !r.truth.includes(k))) wrong++;
+    }
+    const pc = (n) => `${((100 * n) / results.length).toFixed(0)}%`.padStart(6);
+    console.log(`   ${strat.name.padEnd(34)}${pc(hit)}  ${pc(wrong)}  ${pc(blank)}`);
   }
-  const pc = (n) => `${((100 * n) / results.length).toFixed(0)}%`;
-  console.log(`${feature}`);
-  console.log(`   correct ${pc(hit)}   wrong ${pc(wrong)}   blank ${pc(blank)}   (of ${results.length})`);
+  console.log("");
 }
 
 console.log("\nfirst 12 in detail:");
 for (const r of results.slice(0, 12)) {
-  const got = (r.TEXT_DETECTION ?? []).slice(0, 6).join(",") || "-";
-  const ok = (r.TEXT_DETECTION ?? []).some((t) => r.truth.includes(t));
+  const cands = r.TEXT_DETECTION ?? [];
+  const got = cands.slice(0, 4).map((c) => `${c.text}(h${c.height} off${c.offCentre.toFixed(2)})`).join(" ") || "-";
+  const ok = cands[0] && r.truth.includes(cands[0].text);
   console.log(`  ${ok ? "hit " : "miss"} ${r.id.padEnd(12)} tagged ${r.truth.join(",").padEnd(12)} read: ${got}`);
 }
