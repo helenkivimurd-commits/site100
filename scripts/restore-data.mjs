@@ -90,6 +90,40 @@ for (const f of files) {
     process.exit(1);
   }
 
+  // An in-place restore undoes everything done since that backup was taken.
+  // That is the whole point when the file is ruined, and a disaster when it is
+  // merely a day old — so say exactly what would be lost, and do not act on a
+  // day's copy that is quieter than what is already there without being told
+  // twice.
+  if (inPlace && !process.argv.includes("--yes")) {
+    let live;
+    try {
+      live = JSON.parse(await fs.readFile(target, "utf-8"));
+    } catch {
+      live = null;
+    }
+    if (live) {
+      const stored = JSON.parse(body.toString("utf-8"));
+      const changed = Object.keys(live).filter(
+        (k) => JSON.stringify(live[k]) !== JSON.stringify(stored[k])
+      );
+      const gone = Object.keys(live).filter((k) => !(k in stored));
+      if (changed.length || gone.length) {
+        console.error(`\n  ${f.name}: this would undo work.`);
+        console.error(`    ${changed.length} entr(ies) differ from the copy on disk`);
+        if (gone.length) console.error(`    ${gone.length} would disappear entirely`);
+        for (const k of changed.slice(0, 10)) {
+          const title = live[k]?.title ?? k;
+          console.error(`      ${title}: now ${JSON.stringify(live[k])}`);
+          console.error(`      ${" ".repeat(title.length)}  back to ${JSON.stringify(stored[k])}`);
+        }
+        if (changed.length > 10) console.error(`      ... and ${changed.length - 10} more`);
+        console.error(`\n    Add --yes if that is really what you want.`);
+        process.exit(1);
+      }
+    }
+  }
+
   if (!inPlace) {
     const beside = `${target}.from-${day}`;
     await fs.writeFile(beside, body);
