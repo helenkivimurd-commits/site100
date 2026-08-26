@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { TZ, localDay, readEvents } from "@/lib/analytics";
 import { getPhotoMap } from "@/lib/catalog";
+import SoldPhoto from "./SoldPhoto";
 import { readJsonFile } from "@/lib/storage";
 import { ORDERS_FILE } from "@/lib/storage";
 
@@ -170,15 +171,17 @@ export default async function StatsPage() {
             {sales.map((o) => (
               <li key={o.sessionId} className="flex flex-wrap items-center gap-3 rounded-md border border-card p-3">
                 <span className="flex gap-1.5">
-                  {(o.photoIds ?? []).map((id) => (
-                    /* eslint-disable-next-line @next/next/no-img-element */
-                    <img
-                      key={id}
-                      src={`/api/photo/thumb/${id}`}
-                      alt={catalogue.get(id)?.title ?? id}
-                      className="h-14 w-20 rounded-sm object-cover"
-                    />
-                  ))}
+                  {(o.photoIds ?? []).map((id) => {
+                    const p = catalogue.get(id);
+                    return (
+                      <SoldPhoto
+                        key={id}
+                        id={id}
+                        title={p?.title ?? id}
+                        caption={p ? `${p.event} · ${p.discipline}${p.bibs.length ? ` · bib ${p.bibs.join(", ")}` : ""}` : undefined}
+                      />
+                    );
+                  })}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block font-mono text-sm">
@@ -218,8 +221,12 @@ export default async function StatsPage() {
           <ul className="flex flex-wrap gap-3">
             {bestSellers.filter((b) => b.n > 1).map((b) => (
               <li key={b.id} className="w-28">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={`/api/photo/thumb/${b.id}`} alt={b.photo?.title ?? b.id} className="h-20 w-28 rounded-sm object-cover" />
+                <SoldPhoto
+                  id={b.id}
+                  title={b.photo?.title ?? b.id}
+                  caption={b.photo ? `${b.photo.event} · ${b.photo.discipline}` : undefined}
+                  className="h-20 w-28"
+                />
                 <p className="mt-1 font-mono text-[10px] text-muted">
                   {b.photo?.title ?? b.id} · sold {b.n}×
                 </p>
