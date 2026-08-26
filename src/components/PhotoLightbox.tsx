@@ -92,7 +92,10 @@ export default function PhotoLightbox({
 
         {/* Natural flow, not justify-between: pushing the price to the bottom
             of a tall panel left a large empty gap that read as unfinished. */}
-        <div className="flex w-full flex-col gap-6 p-6 md:w-80 md:shrink-0 md:overflow-y-auto">
+        {/* pt-16 on the panel, not a moved button: the close control belongs in
+            the corner, and the bib is the first thing anyone reads here — it
+            was sitting underneath it. */}
+        <div className="flex w-full flex-col gap-6 p-6 pt-16 md:w-80 md:shrink-0 md:overflow-y-auto">
           <div>
             <dl className="space-y-2 font-mono text-xs text-muted">
               <div className="flex justify-between border-b border-card pb-2">
