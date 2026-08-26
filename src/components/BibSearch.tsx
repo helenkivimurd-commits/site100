@@ -29,6 +29,7 @@ export default function BibSearch({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             inputMode="numeric"
+            enterKeyHint="search"
             placeholder="Bib number"
             aria-label="Bib number"
             className="w-full bg-transparent py-2.5 font-mono text-sm text-ink outline-none placeholder:text-muted"
@@ -69,15 +70,29 @@ export default function BibSearch({
       </label>
       {/* Placeholder kept very faint: at this size a darker one reads as a
           number already filled in rather than an example. */}
-      <input
-        id="bib-input"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        inputMode="numeric"
-        placeholder="1410"
-        aria-label="Your bib number"
-        className="mt-2 w-full border-b-2 border-dashed border-ink/20 bg-transparent pb-2 text-center font-mono text-5xl font-medium tracking-wide text-ink outline-none placeholder:text-ink/15 sm:text-6xl"
-      />
+      {/* The arrow sits beside the number on purpose. A phone showing a numeric
+          keypad has no return key to press, and the big button below is behind
+          the keyboard once it opens — so on a phone there was nothing reachable
+          to search with at all. This stays next to what you are typing. */}
+      <div className="mt-2 flex items-center gap-2 border-b-2 border-dashed border-ink/20 pb-2">
+        <input
+          id="bib-input"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          inputMode="numeric"
+          enterKeyHint="search"
+          placeholder="1410"
+          aria-label="Your bib number"
+          className="w-full min-w-0 bg-transparent text-center font-mono text-5xl font-medium tracking-wide text-ink outline-none placeholder:text-ink/15 sm:text-6xl"
+        />
+        <button
+          type="submit"
+          aria-label="Find my photos"
+          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-blue text-xl text-white transition-colors hover:bg-blue-hover active:bg-blue-active sm:hidden"
+        >
+          &rarr;
+        </button>
+      </div>
       <button
         type="submit"
         className="mt-6 w-full rounded-full bg-blue py-3.5 font-mono text-sm uppercase tracking-wide text-white transition-colors hover:bg-blue-hover active:bg-blue-active"

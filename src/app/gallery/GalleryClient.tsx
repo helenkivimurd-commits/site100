@@ -82,13 +82,14 @@ export default function GalleryClient({
 
           <form
             onSubmit={onSubmit}
-            className="flex w-full max-w-md items-center gap-2 rounded-md border border-ink/15 bg-page px-3"
+            className="flex w-full max-w-md items-center gap-2 rounded-md border border-ink/15 bg-page pl-3 pr-3"
           >
             <span className="font-mono text-sm text-muted">#</span>
             <input
               value={bib}
               onChange={(e) => setBib(e.target.value)}
               inputMode="numeric"
+              enterKeyHint="search"
               placeholder={
                 insideFolder
                   ? "Filter these photos by bib"
@@ -117,6 +118,20 @@ export default function GalleryClient({
                 </svg>
               </button>
             ) : null}
+            {/* This form had no button of any kind, so pressing Enter was the
+                only way to run the search — and a phone showing a numeric
+                keypad has no Enter to press. On a phone there was simply no way
+                to search a different number once you were in the gallery. */}
+            <button
+              type="submit"
+              aria-label="Search"
+              className="-mr-2 my-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-blue text-white transition-colors hover:bg-blue-hover active:bg-blue-active"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+                <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+            </button>
           </form>
         </div>
       </div>
