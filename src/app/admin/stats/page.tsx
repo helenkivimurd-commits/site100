@@ -1,12 +1,19 @@
 import Link from "next/link";
-import { localDay, readEvents } from "@/lib/analytics";
+import { TZ, localDay, readEvents } from "@/lib/analytics";
+import { getPhotoMap } from "@/lib/catalog";
 import { readJsonFile } from "@/lib/storage";
 import { ORDERS_FILE } from "@/lib/storage";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Visitors — h_kivimurd Photography" };
 
-type Order = { amountTotal?: number; photoIds?: string[]; status?: string; createdAt?: string };
+type Order = {
+  amountTotal?: number;
+  photoIds?: string[];
+  status?: string;
+  createdAt?: string;
+  sessionId?: string;
+};
 
 const DAYS = 30;
 
@@ -60,8 +67,39 @@ async function gather() {
   const people = new Set(views.map((e) => e.v).filter(Boolean)).size;
   const searchers = new Set(searches.map((e) => e.v).filter(Boolean)).size;
 
+  const catalogue = await getPhotoMap();
+
+  // Sessions Stripe opened in test mode while the shop was being set up. Real
+  // money only, or the figures flatter themselves.
+  const real = Object.values(orders).filter((o) => !o.sessionId?.startsWith("cs_test"));
+  const sales = real
+    .filter((o) => o.status === "paid")
+    .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
+
+  // Which photographs people actually pay for.
+  const boughtCount = new Map<string, number>();
+  for (const o of sales) for (const id of o.photoIds ?? []) {
+    boughtCount.set(id, (boughtCount.get(id) ?? 0) + 1);
+  }
+  const bestSellers = [...boughtCount.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 12)
+    .map(([id, n]) => ({ id, n, photo: catalogue.get(id) }));
+
+  const byAlbum = new Map<string, number>();
+  for (const [id] of boughtCount) {
+    const p = catalogue.get(id);
+    if (!p) continue;
+    const name = `${p.event} · ${p.discipline}`;
+    byAlbum.set(name, (byAlbum.get(name) ?? 0) + (boughtCount.get(id) ?? 0));
+  }
+
   const paidInWindow = Object.values(orders).filter(
-    (o) => o.status === "paid" && o.createdAt && Date.parse(o.createdAt) > now - DAYS * 86_400_000
+    (o) =>
+      o.status === "paid" &&
+      !o.sessionId?.startsWith("cs_test") &&
+      o.createdAt &&
+      Date.parse(o.createdAt) > now - DAYS * 86_400_000
   );
   const earned = paidInWindow.reduce((n, o) => n + (o.amountTotal ?? 0), 0);
   const sold = paidInWindow.reduce((n, o) => n + (o.photoIds?.length ?? 0), 0);
@@ -80,6 +118,7 @@ async function gather() {
     events, people, views, searches, failed, vague, searchers,
     peopleOn, viewsOn, days, busiest,
     earned, sold, paidInWindow, fromWhere, pages, missed, found,
+    sales, bestSellers, byAlbum, catalogue,
   };
 }
 
@@ -88,6 +127,7 @@ export default async function StatsPage() {
     events, people, views, searches, failed, vague, searchers,
     peopleOn, viewsOn, days, busiest,
     earned, sold, paidInWindow, fromWhere, pages, missed, found,
+    sales, bestSellers, byAlbum, catalogue,
   } = await gather();
 
   return (
@@ -119,6 +159,83 @@ export default async function StatsPage() {
           Nothing recorded yet. Counting starts from the moment this went live — open the site in
           another browser and this page will show it.
         </p>
+      )}
+
+      <Section title="What people bought"
+        note="Every photo anyone has paid for, newest first. Test purchases from setting the shop up are left out.">
+        {sales.length === 0 ? (
+          <p className="text-sm text-muted">Nothing sold yet.</p>
+        ) : (
+          <ul className="space-y-3">
+            {sales.map((o) => (
+              <li key={o.sessionId} className="flex flex-wrap items-center gap-3 rounded-md border border-card p-3">
+                <span className="flex gap-1.5">
+                  {(o.photoIds ?? []).map((id) => (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      key={id}
+                      src={`/api/photo/thumb/${id}`}
+                      alt={catalogue.get(id)?.title ?? id}
+                      className="h-14 w-20 rounded-sm object-cover"
+                    />
+                  ))}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block font-mono text-sm">
+                    {(o.photoIds ?? [])
+                      .map((id) => catalogue.get(id)?.title ?? `${id} (deleted)`)
+                      .join(", ")}
+                  </span>
+                  <span className="block font-mono text-xs text-muted">
+                    {(o.photoIds ?? [])
+                      .map((id) => {
+                        const p = catalogue.get(id);
+                        return p ? `${p.event} · ${p.discipline}${p.bibs.length ? ` · bib ${p.bibs.join(", ")}` : ""}` : "";
+                      })
+                      .filter(Boolean)
+                      .join(" | ") || "—"}
+                  </span>
+                </span>
+                <span className="shrink-0 text-right">
+                  <span className="block font-display text-xl">€{((o.amountTotal ?? 0) / 100).toFixed(2)}</span>
+                  <span className="block font-mono text-[10px] text-muted">
+                    {o.createdAt
+                      ? new Date(o.createdAt).toLocaleString("en-GB", {
+                          day: "numeric", month: "short", hour: "2-digit", minute: "2-digit", timeZone: TZ,
+                        })
+                      : ""}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        )}
+      </Section>
+
+      {bestSellers.length > 1 && (
+        <Section title="Sold more than once"
+          note="A photo several people wanted is worth knowing about — it is the kind you should take more of.">
+          <ul className="flex flex-wrap gap-3">
+            {bestSellers.filter((b) => b.n > 1).map((b) => (
+              <li key={b.id} className="w-28">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={`/api/photo/thumb/${b.id}`} alt={b.photo?.title ?? b.id} className="h-20 w-28 rounded-sm object-cover" />
+                <p className="mt-1 font-mono text-[10px] text-muted">
+                  {b.photo?.title ?? b.id} · sold {b.n}×
+                </p>
+              </li>
+            ))}
+          </ul>
+          {bestSellers.every((b) => b.n === 1) && (
+            <p className="text-sm text-muted">Every photo sold so far has sold once.</p>
+          )}
+        </Section>
+      )}
+
+      {byAlbum.size > 0 && (
+        <Section title="Which albums sell">
+          <Bars rows={[...byAlbum.entries()].sort((a, b) => b[1] - a[1])} total={sold || 1} />
+        </Section>
       )}
 
       <Section title="Searches that found nothing"
