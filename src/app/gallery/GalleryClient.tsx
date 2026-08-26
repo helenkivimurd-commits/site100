@@ -21,9 +21,11 @@ import { splitByBib, NO_BIB_ALBUM } from "@/lib/browse";
 export default function GalleryClient({
   view,
   initialBib,
+  openPhotoId = "",
 }: {
   view: BrowseView;
   initialBib: string;
+  openPhotoId?: string;
 }) {
   const router = useRouter();
   const [bib, setBib] = useState(initialBib);
@@ -175,11 +177,11 @@ export default function GalleryClient({
           />
         ) : filtered.photos.length > 0 ? (
           <>
-            <PhotoGrid photos={filtered.photos} />
-            {filtered.maybes.length > 0 && <MaybeSection photos={filtered.maybes} bib={bib} />}
+            <PhotoGrid photos={filtered.photos} openPhotoId={openPhotoId} />
+            {filtered.maybes.length > 0 && <MaybeSection photos={filtered.maybes} bib={bib} openPhotoId={openPhotoId} />}
           </>
         ) : filtered.maybes.length > 0 ? (
-          <MaybeSection photos={filtered.maybes} bib={bib} soleResult />
+          <MaybeSection photos={filtered.maybes} bib={bib} soleResult openPhotoId={openPhotoId} />
         ) : bib.trim() ? (
           <NothingFound
             event={scopeEvent}
@@ -428,10 +430,12 @@ function MaybeSection({
   photos,
   bib,
   soleResult = false,
+  openPhotoId = "",
 }: {
   photos: Photo[];
   bib: string;
   soleResult?: boolean;
+  openPhotoId?: string;
 }) {
   return (
     <section className={soleResult ? "" : "mt-16 border-t border-card pt-10"}>
@@ -445,7 +449,7 @@ function MaybeSection({
         the number is hidden, so some of these will be other runners.
       </p>
       <div className="mt-6">
-        <PhotoGrid photos={photos} />
+        <PhotoGrid photos={photos} openPhotoId={openPhotoId} />
       </div>
     </section>
   );

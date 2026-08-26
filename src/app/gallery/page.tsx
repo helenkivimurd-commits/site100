@@ -15,9 +15,15 @@ export const metadata = {
 export default async function GalleryPage({
   searchParams,
 }: {
-  searchParams: Promise<{ bib?: string; event?: string; discipline?: string; nobib?: string }>;
+  searchParams: Promise<{
+    bib?: string;
+    event?: string;
+    discipline?: string;
+    nobib?: string;
+    photo?: string;
+  }>;
 }) {
-  const { bib, event, discipline, nobib } = await searchParams;
+  const { bib, event, discipline, nobib, photo } = await searchParams;
   const photos = await getPhotos();
 
   // Which of the three levels this is — events, disciplines, or photos — is
@@ -44,5 +50,5 @@ export default async function GalleryPage({
     });
   }
 
-  return <GalleryClient view={view} initialBib={bib ?? ""} />;
+  return <GalleryClient view={view} initialBib={bib ?? ""} openPhotoId={photo ?? ""} />;
 }
