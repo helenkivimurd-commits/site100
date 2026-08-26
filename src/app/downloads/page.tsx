@@ -17,11 +17,35 @@ type LoadedOrder = {
 
 export default function DownloadsPage() {
   const [orders, setOrders] = useState<LoadedOrder[] | null>(null);
+  // A link that was sent to someone carries its own token. Their browser was
+  // never at the checkout and remembers nothing, so the token is the only thing
+  // that can say which photos are theirs — and it shows those alone, not
+  // whatever else this browser happens to remember buying.
+  const [sentLink, setSentLink] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
 
     (async () => {
+      const token =
+        typeof window === "undefined"
+          ? null
+          : new URLSearchParams(window.location.search).get("token");
+
+      if (token) {
+        setSentLink(true);
+        try {
+          const res = await fetch(`/api/order?token=${encodeURIComponent(token)}`);
+          const body = res.ok ? await res.json() : null;
+          if (!cancelled) {
+            setOrders(body && body.status === "paid" ? [{ sessionId: token, ...body }] : []);
+          }
+        } catch {
+          if (!cancelled) setOrders([]);
+        }
+        return;
+      }
+
       const saved = loadPurchases();
       const loaded: LoadedOrder[] = [];
 
@@ -62,9 +86,9 @@ export default function DownloadsPage() {
     return (
       <Shell>
         <p className="text-sm text-muted">
-          No purchases found on this device. Download links are remembered per browser —
-          if you bought on your phone, open this page there, or use the links in your
-          confirmation email.
+          {sentLink
+            ? "This link isn't valid any more. Links last 30 days — ask whoever sent it for a new one."
+            : "No purchases found on this device. Download links are remembered per browser — if you bought on your phone, open this page there, or use the links in your confirmation email."}
         </p>
         <Link
           href="/gallery"
@@ -78,20 +102,24 @@ export default function DownloadsPage() {
 
   return (
     <div className="mx-auto max-w-3xl px-5 py-16 sm:px-8 sm:py-20">
-      <p className="font-mono text-xs uppercase tracking-[0.25em] text-muted">Your purchases</p>
+      <p className="font-mono text-xs uppercase tracking-[0.25em] text-muted">
+        {sentLink ? "Shared with you" : "Your purchases"}
+      </p>
       <h1 className="mt-3 font-display text-4xl uppercase tracking-wide sm:text-5xl">
-        My photos
+        {sentLink ? "Your photos" : "My photos"}
       </h1>
       <p className="mt-3 text-sm text-muted">
-        Everything you&apos;ve bought in this browser. Full resolution, no watermark.
+        {sentLink
+          ? "Full resolution, no watermark — exactly as they came out of the camera."
+          : "Everything you've bought in this browser. Full resolution, no watermark."}
       </p>
 
       {orders.map((order) => (
         <section key={order.sessionId} className="mt-12">
           <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-card pb-2">
             <h2 className="font-mono text-xs uppercase tracking-[0.2em] text-muted">
-              {order.photos.length} photo{order.photos.length === 1 ? "" : "s"} ·{" "}
-              {formatMoney(order.amountTotal / 100)}
+              {order.photos.length} photo{order.photos.length === 1 ? "" : "s"}
+              {order.amountTotal > 0 ? ` · ${formatMoney(order.amountTotal / 100)}` : ""}
             </h2>
             <span className="font-mono text-xs text-muted">
               Links expire{" "}
