@@ -10,6 +10,9 @@
   --blue-active: #152cb8;
   --magenta: #ff2e93;
   --magenta-hover: #e81a7e;
+  /* Only ever used for a number that is good news, opposite the magenta. Dark
+     enough to read as text on the near-white page rather than glow on it. */
+  --green: #00875a;
 }
 
 @theme inline {
@@ -22,6 +25,7 @@
   --color-blue-active: var(--blue-active);
   --color-magenta: var(--magenta);
   --color-magenta-hover: var(--magenta-hover);
+  --color-green: var(--green);
 
   --font-display: var(--font-big-shoulders);
   --font-accent: var(--font-instrument-serif);

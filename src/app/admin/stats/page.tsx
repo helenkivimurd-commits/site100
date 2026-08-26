@@ -20,6 +20,18 @@ type Order = {
 
 const DAYS = 30;
 
+// What the shop has cost and what it keeps, kept here so the sum below reads as
+// arithmetic rather than as three unexplained numbers.
+//
+// Profit is counted over everything ever sold, not the last thirty days: the
+// question it answers is whether the site has paid for itself yet, and the €52
+// was spent once.
+const SETUP_COST = 52;
+/** One €5 order was Helen's own, buying from herself to test a real card. */
+const OWN_TEST_PURCHASE = 5;
+/** The share of each euro she keeps once fees are taken. */
+const KEPT_PER_EURO = 0.9524;
+
 // Days are counted in Estonian time, not UTC. Someone searching at eleven at
 // night is looking today, and would otherwise be filed under yesterday —
 // which matters exactly when it is being looked at: the evening after a race,
@@ -108,6 +120,10 @@ async function gather() {
       Date.parse(o.createdAt) > now - DAYS * 86_400_000
   );
   const earned = paidInWindow.reduce((n, o) => n + (o.amountTotal ?? 0), 0);
+
+  // Everything ever taken, in euros.
+  const grossAllTime = sales.reduce((n, o) => n + (o.amountTotal ?? 0), 0) / 100;
+  const profit = (grossAllTime - OWN_TEST_PURCHASE) * KEPT_PER_EURO - SETUP_COST;
   const sold = paidInWindow.reduce((n, o) => n + (o.photoIds?.length ?? 0), 0);
 
   const tally = (rows: string[]) => {
@@ -125,6 +141,7 @@ async function gather() {
     peopleOn, viewsOn, days, busiest,
     earned, sold, paidInWindow, fromWhere, pages, missed, found,
     sales, bestSellers, byAlbum, catalogue,
+    grossAllTime, profit,
   };
 }
 
@@ -134,6 +151,7 @@ export default async function StatsPage() {
     peopleOn, viewsOn, days, busiest,
     earned, sold, paidInWindow, fromWhere, pages, missed, found,
     sales, bestSellers, byAlbum, catalogue,
+    grossAllTime, profit,
   } = await gather();
 
   return (
@@ -149,6 +167,16 @@ export default async function StatsPage() {
       </Link>
 
       <div className="mt-8 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Figure
+          label="Profit"
+          value={`${profit < 0 ? "−" : ""}€${Math.abs(profit).toFixed(2)}`}
+          note={
+            profit < 0
+              ? `€${grossAllTime.toFixed(2)} sold · €${(SETUP_COST / KEPT_PER_EURO + OWN_TEST_PURCHASE).toFixed(2)} pays it back`
+              : `€${grossAllTime.toFixed(2)} sold, less your own €${OWN_TEST_PURCHASE} and €${SETUP_COST} setup`
+          }
+          tone={profit > 0 ? "good" : profit < 0 ? "bad" : undefined}
+        />
         <Figure label="People" value={people} note={`${views.length} pages opened`} />
         <Figure label="Searched a bib" value={searchers} note={`${searches.length} searches`} />
         <Figure
@@ -315,11 +343,34 @@ export default async function StatsPage() {
   );
 }
 
-function Figure({ label, value, note, warn }: { label: string; value: number | string; note?: string; warn?: boolean }) {
+function Figure({
+  label,
+  value,
+  note,
+  warn,
+  tone,
+}: {
+  label: string;
+  value: number | string;
+  note?: string;
+  warn?: boolean;
+  /** Whether the number itself is good news or bad, quite apart from wanting attention. */
+  tone?: "good" | "bad";
+}) {
+  const border =
+    tone === "good"
+      ? "border-green/50"
+      : tone === "bad"
+        ? "border-magenta/50"
+        : warn
+          ? "border-magenta/40"
+          : "border-card";
+  const text =
+    tone === "good" ? "text-green" : tone === "bad" || warn ? "text-magenta" : "";
   return (
-    <div className={`rounded-md border p-4 ${warn ? "border-magenta/40" : "border-card"}`}>
+    <div className={`rounded-md border p-4 ${border}`}>
       <p className="font-mono text-[10px] uppercase tracking-wide text-muted">{label}</p>
-      <p className={`mt-1 font-display text-3xl ${warn ? "text-magenta" : ""}`}>{value}</p>
+      <p className={`mt-1 font-display text-3xl ${text}`}>{value}</p>
       {note && <p className="mt-0.5 font-mono text-[10px] text-muted">{note}</p>}
     </div>
   );
