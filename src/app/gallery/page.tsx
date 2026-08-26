@@ -37,7 +37,14 @@ export default async function GalleryPage({
   // shop and being unable to act on it is how wrong numbers stay wrong.
   const head = await headers();
   const access = await checkAdminAccess(
-    new Request("http://gallery.local", { headers: { cookie: head.get("cookie") ?? "" } })
+    new Request("http://gallery.local", {
+      headers: {
+        cookie: head.get("cookie") ?? "",
+        // Both, because either can carry the proof: the session cookie once
+        // /admin has been opened in this browser, or Basic auth on its own.
+        authorization: head.get("authorization") ?? "",
+      },
+    })
   );
   const isAdmin = access.status === "ok";
 
