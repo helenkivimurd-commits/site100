@@ -14,6 +14,8 @@ type Order = {
   status?: string;
   createdAt?: string;
   sessionId?: string;
+  /** Made by hand to send someone a photo — not money, never a sale. */
+  gift?: boolean;
 };
 
 const DAYS = 30;
@@ -72,7 +74,9 @@ async function gather() {
 
   // Sessions Stripe opened in test mode while the shop was being set up. Real
   // money only, or the figures flatter themselves.
-  const real = Object.values(orders).filter((o) => !o.sessionId?.startsWith("cs_test"));
+  const real = Object.values(orders).filter(
+    (o) => !o.sessionId?.startsWith("cs_test") && !o.gift
+  );
   const sales = real
     .filter((o) => o.status === "paid")
     .sort((a, b) => (b.createdAt ?? "").localeCompare(a.createdAt ?? ""));
@@ -99,6 +103,7 @@ async function gather() {
     (o) =>
       o.status === "paid" &&
       !o.sessionId?.startsWith("cs_test") &&
+      !o.gift &&
       o.createdAt &&
       Date.parse(o.createdAt) > now - DAYS * 86_400_000
   );

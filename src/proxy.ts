@@ -21,7 +21,15 @@ const LOGIN_WINDOW_MS = 15 * 60 * 1000;
 // Deliberately NOT matched: /api/download, which paying customers hit without
 // ever logging in. It has its own gate — a one-time token tied to a paid order.
 export const config = {
-  matcher: ["/admin", "/admin/:path*", "/api/photos", "/api/photos/:path*"],
+  matcher: [
+    "/admin",
+    "/admin/:path*",
+    "/api/photos",
+    "/api/photos/:path*",
+    // Mints download links to original files. Guarded here as well as in the
+    // route itself.
+    "/api/share",
+  ],
 };
 
 export async function proxy(request: NextRequest) {

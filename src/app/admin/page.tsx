@@ -111,6 +111,13 @@ export default function AdminPage() {
   // Seeded from ?find= so the "Fix in admin" link on a photo arrives with that
   // photo already found. Read once, at first render, rather than watched — she
   // is free to type over it immediately.
+  // The last link made, kept on screen so it can be copied rather than
+  // vanishing into a toast the moment it exists.
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [shareNote, setShareNote] = useState("");
+  const [sharing, setSharing] = useState(false);
+  const [shareError, setShareError] = useState("");
+
   const [query, setQuery] = useState(() =>
     typeof window === "undefined"
       ? ""
@@ -341,6 +348,29 @@ function formatRaceDay(iso: string): string {
     }
     setUploadStatus(parts.join(" ") || "Nothing uploaded.");
     setUploading(false);
+  }
+
+  async function makeShareLink() {
+    setSharing(true);
+    setShareError("");
+    setShareLink(null);
+    try {
+      const res = await fetch("/api/share", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ photoIds: [...selected], for: shareNote }),
+      });
+      const body = (await res.json().catch(() => ({}))) as { url?: string; error?: string };
+      if (!res.ok || !body.url) {
+        setShareError(body.error ?? `Couldn't make a link (${res.status})`);
+        return;
+      }
+      setShareLink(body.url);
+    } catch {
+      setShareError("Couldn't make a link — no connection");
+    } finally {
+      setSharing(false);
+    }
   }
 
   async function save(id: string, fields: Partial<{ bibs: string[]; reviewed: boolean; day: string; discipline: Discipline; title: string }>) {
@@ -770,12 +800,56 @@ function formatRaceDay(iso: string): string {
         </div>
       </div>
 
+      {(shareLink || shareError) && (
+        <div className="mt-4 rounded-md border border-blue bg-page p-4">
+          {shareError ? (
+            <p className="font-mono text-sm text-magenta">{shareError}</p>
+          ) : (
+            <>
+              <p className="font-mono text-[11px] uppercase tracking-wide text-blue">
+                Download link &mdash; full size, no watermark, works for 30 days
+              </p>
+              <input
+                readOnly
+                value={shareLink ?? ""}
+                onFocus={(e) => e.currentTarget.select()}
+                className="mt-2 w-full rounded-md border border-ink/15 bg-card px-3 py-2 font-mono text-sm outline-none"
+              />
+              <p className="mt-2 font-mono text-[11px] text-muted">
+                Click the box to select it, then copy. Anyone with this link can download those
+                photos, so send it to the person and nowhere else.
+              </p>
+            </>
+          )}
+        </div>
+      )}
+
       {selected.size > 0 && (
         <div className="sticky top-[73px] z-20 mt-4 rounded-md border border-blue bg-page p-4 shadow-sm sm:top-[81px]">
           <div className="flex flex-wrap items-end gap-3">
             <p className="font-mono text-xs uppercase tracking-wide text-blue">
               {selected.size} selected
             </p>
+            <div className="flex flex-col gap-1">
+              <label className="font-mono text-[11px] uppercase tracking-wide text-muted">
+                Send these to someone
+              </label>
+              <div className="flex items-center gap-2">
+                <input
+                  value={shareNote}
+                  onChange={(e) => setShareNote(e.target.value)}
+                  placeholder="Who it is for (optional)"
+                  className="rounded-md border border-ink/15 bg-page px-2 py-1.5 text-sm outline-none focus:border-blue"
+                />
+                <button
+                  onClick={makeShareLink}
+                  disabled={sharing}
+                  className="rounded-full bg-blue px-3.5 py-1.5 font-mono text-xs uppercase tracking-wide text-white transition-colors hover:bg-blue-hover disabled:opacity-50"
+                >
+                  {sharing ? "Making…" : "Make a link"}
+                </button>
+              </div>
+            </div>
             <div className="flex flex-col gap-1">
               <label className="font-mono text-[11px] uppercase tracking-wide text-muted">Day</label>
               <input

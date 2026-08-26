@@ -23,6 +23,14 @@ export type Order = {
   createdAt: string;
   expiresAt: string;
   emailSentAt?: string;
+  /**
+   * A link she made herself to send someone a photo, rather than a purchase.
+   * It downloads exactly as a bought one does — full size, no watermark — but
+   * it is not money and must never be counted as a sale.
+   */
+  gift?: true;
+  /** Who it was for, so a list of links is readable months later. */
+  giftFor?: string;
 };
 
 // Same read-modify-write guard as the photos API: concurrent webhook retries
@@ -76,6 +84,36 @@ export async function createPendingOrder(
       status: "pending",
       createdAt: now.toISOString(),
       expiresAt: new Date(now.getTime() + DOWNLOAD_DAYS * 86400_000).toISOString(),
+    };
+    data[sessionId] = order;
+    await writeData(data);
+    return order;
+  });
+}
+
+/**
+ * A download link made by hand, for sending a photo to someone directly.
+ *
+ * It is stored as a paid order because that is exactly what it has to behave
+ * like: the same token, the same expiry, the same download route, the same
+ * full-quality file. Marking it as a gift keeps it out of the takings.
+ */
+export async function createShareLink(photoIds: string[], giftFor: string | null): Promise<Order> {
+  return withQueue(async () => {
+    const data = await readData();
+    const now = new Date();
+    const sessionId = `gift_${crypto.randomBytes(9).toString("base64url")}`;
+    const order: Order = {
+      sessionId,
+      token: newToken(),
+      email: null,
+      photoIds,
+      amountTotal: 0,
+      status: "paid",
+      createdAt: now.toISOString(),
+      expiresAt: new Date(now.getTime() + DOWNLOAD_DAYS * 86400_000).toISOString(),
+      gift: true,
+      ...(giftFor ? { giftFor } : {}),
     };
     data[sessionId] = order;
     await writeData(data);
