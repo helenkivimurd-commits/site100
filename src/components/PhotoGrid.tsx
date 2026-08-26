@@ -17,11 +17,9 @@ import type { Photo } from "@/lib/types";
 export default function PhotoGrid({
   photos,
   openPhotoId = "",
-  isAdmin = false,
 }: {
   photos: Photo[];
   openPhotoId?: string;
-  isAdmin?: boolean;
 }) {
   // Read from the server's own parse of the query, so the first render already
   // agrees with the address bar and there is nothing to correct afterwards.
@@ -85,7 +83,7 @@ export default function PhotoGrid({
       {active && (
         <PhotoLightbox
           photo={active}
-          isAdmin={isAdmin}
+         
           onClose={close}
           onPrev={activeIndex! > 0 ? () => step(activeIndex! - 1) : undefined}
           onNext={activeIndex! < photos.length - 1 ? () => step(activeIndex! + 1) : undefined}

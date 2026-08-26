@@ -22,12 +22,10 @@ export default function GalleryClient({
   view,
   initialBib,
   openPhotoId = "",
-  isAdmin = false,
 }: {
   view: BrowseView;
   initialBib: string;
   openPhotoId?: string;
-  isAdmin?: boolean;
 }) {
   const router = useRouter();
   const [bib, setBib] = useState(initialBib);
@@ -179,8 +177,8 @@ export default function GalleryClient({
           />
         ) : filtered.photos.length > 0 ? (
           <>
-            <PhotoGrid photos={filtered.photos} openPhotoId={openPhotoId} isAdmin={isAdmin} />
-            {filtered.maybes.length > 0 && <MaybeSection photos={filtered.maybes} bib={bib} openPhotoId={openPhotoId} isAdmin={isAdmin} />}
+            <PhotoGrid photos={filtered.photos} openPhotoId={openPhotoId} />
+            {filtered.maybes.length > 0 && <MaybeSection photos={filtered.maybes} bib={bib} openPhotoId={openPhotoId} />}
           </>
         ) : filtered.maybes.length > 0 ? (
           <MaybeSection
@@ -188,7 +186,7 @@ export default function GalleryClient({
             bib={bib}
             soleResult
             openPhotoId={openPhotoId}
-            isAdmin={isAdmin}
+           
           />
         ) : bib.trim() ? (
           <NothingFound
@@ -439,13 +437,11 @@ function MaybeSection({
   bib,
   soleResult = false,
   openPhotoId = "",
-  isAdmin = false,
 }: {
   photos: Photo[];
   bib: string;
   soleResult?: boolean;
   openPhotoId?: string;
-  isAdmin?: boolean;
 }) {
   return (
     <section className={soleResult ? "" : "mt-16 border-t border-card pt-10"}>
@@ -459,7 +455,7 @@ function MaybeSection({
         the number is hidden, so some of these will be other runners.
       </p>
       <div className="mt-6">
-        <PhotoGrid photos={photos} openPhotoId={openPhotoId} isAdmin={isAdmin} />
+        <PhotoGrid photos={photos} openPhotoId={openPhotoId} />
       </div>
     </section>
   );

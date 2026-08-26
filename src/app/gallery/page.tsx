@@ -3,7 +3,6 @@ import GalleryClient from "./GalleryClient";
 import { getPhotos } from "@/lib/catalog";
 import { browse } from "@/lib/browse";
 import { record, referrerName, visitorHash } from "@/lib/analytics";
-import { checkAdminAccess } from "@/lib/adminAuth";
 
 // The catalogue is read per request, so a photo uploaded through /admin is
 // in the gallery immediately instead of waiting for the next build.
@@ -32,21 +31,7 @@ export default async function GalleryPage({
   // Opening one discipline sends that discipline, not the whole catalogue.
   const view = browse(photos, { event, discipline, bib, noBib: nobib === "1" });
 
-  // Signed in as admin in this browser? Then each photo gets a quiet link
-  // through to its row in /admin. Spotting a wrong number while browsing the
-  // shop and being unable to act on it is how wrong numbers stay wrong.
   const head = await headers();
-  const access = await checkAdminAccess(
-    new Request("http://gallery.local", {
-      headers: {
-        cookie: head.get("cookie") ?? "",
-        // Both, because either can carry the proof: the session cookie once
-        // /admin has been opened in this browser, or Basic auth on its own.
-        authorization: head.get("authorization") ?? "",
-      },
-    })
-  );
-  const isAdmin = access.status === "ok";
 
   // Recorded here rather than in the browser because this is the number that
   // matters most: a search that finds nothing is a runner who leaves without
@@ -72,7 +57,6 @@ export default async function GalleryPage({
       view={view}
       initialBib={bib ?? ""}
       openPhotoId={photo ?? ""}
-      isAdmin={isAdmin}
     />
   );
 }
