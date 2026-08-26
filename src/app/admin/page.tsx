@@ -65,6 +65,34 @@ const FALLBACK_EVENT = "IRONMAN 70.3 Tallinn European Championship";
 // whole library — can be listed without picking an album.
 const EVERY = "\u0000every";
 
+/**
+ * Photos matching what was typed: a bib number, a filename, the photo's id, or
+ * a link copied from the website — which carries the id in it, so pasting the
+ * address of a photo you were just looking at finds it here.
+ */
+function matchRows(rows: Row[], query: string): Row[] {
+  const q = query.trim().toLowerCase();
+  const pasted = q.match(/[?&]photo=([a-z0-9-]+)/)?.[1];
+  if (pasted) return rows.filter((r) => r.id.toLowerCase() === pasted);
+
+  // A bare number is almost always a bib, and an exact bib is what was meant —
+  // so those come first, ahead of photos that merely contain the digits.
+  const exact: Row[] = [];
+  const loose: Row[] = [];
+  for (const r of rows) {
+    const bibs = r.bibsText.split(/[^0-9]+/).filter(Boolean);
+    if (bibs.some((bib) => bib.toLowerCase() === q)) exact.push(r);
+    else if (
+      r.title.toLowerCase().includes(q) ||
+      r.id.toLowerCase().includes(q) ||
+      bibs.some((bib) => bib.includes(q))
+    ) {
+      loose.push(r);
+    }
+  }
+  return [...exact, ...loose];
+}
+
 export default function AdminPage() {
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,6 +104,18 @@ export default function AdminPage() {
     event: null,
     discipline: null,
   });
+  // Finding one photo when you already know something about it — a bib number
+  // read off the website, a filename, or the link itself. Searching looks
+  // through everything, because the whole point is that you do not know which
+  // folder it is in.
+  // Seeded from ?find= so the "Fix in admin" link on a photo arrives with that
+  // photo already found. Read once, at first render, rather than watched — she
+  // is free to type over it immediately.
+  const [query, setQuery] = useState(() =>
+    typeof window === "undefined"
+      ? ""
+      : (new URLSearchParams(window.location.search).get("find") ?? "")
+  );
 
   // Ids that were still untagged when "Unreviewed only" was switched on.
   // Filtering against this frozen set (rather than the live `reviewed` flag)
@@ -149,15 +189,16 @@ function formatRaceDay(iso: string): string {
     };
   }, []);
 
-  const inFolder = useMemo(
-    () =>
-      rows.filter(
-        (r) =>
-          (folder.event === EVERY || r.event === folder.event) &&
-          (folder.discipline === EVERY || r.discipline === folder.discipline)
-      ),
-    [rows, folder]
-  );
+  const searching = query.trim() !== "";
+
+  const inFolder = useMemo(() => {
+    if (searching) return matchRows(rows, query);
+    return rows.filter(
+      (r) =>
+        (folder.event === EVERY || r.event === folder.event) &&
+        (folder.discipline === EVERY || r.discipline === folder.discipline)
+    );
+  }, [rows, folder, searching, query]);
 
   const visible = useMemo(
     () => (filter === "all" ? inFolder : inFolder.filter((r) => unreviewedSnapshot.has(r.id))),
@@ -182,7 +223,8 @@ function formatRaceDay(iso: string): string {
       .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
   }, [rows, folder.event]);
 
-  const showingFolders = folder.event === null || folder.discipline === null;
+  // A search shows what it found, wherever it lives, rather than the folders.
+  const showingFolders = !searching && (folder.event === null || folder.discipline === null);
   const reviewedCount = inFolder.filter((r) => r.reviewed).length;
   const stillUntagged = visible.filter((r) => !r.reviewed).length;
 
@@ -574,6 +616,30 @@ function formatRaceDay(iso: string): string {
             the tagging screen and the visitor figures unreachable from the page
             everyone lands on. */}
         <span className="order-last ml-auto flex items-center gap-2">
+          <span className="flex items-center gap-1.5 rounded-full border border-ink/15 px-3 py-1.5">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" aria-hidden="true" className="shrink-0 text-muted">
+              <circle cx="11" cy="11" r="7" stroke="currentColor" strokeWidth="2" />
+              <path d="M20 20l-3.5-3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+            </svg>
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Bib, filename or link"
+              aria-label="Find a photo by bib number, filename, or a link copied from the website"
+              className="w-44 bg-transparent font-mono text-xs uppercase tracking-wide text-ink outline-none placeholder:text-muted"
+            />
+            {query && (
+              <button
+                onClick={() => setQuery("")}
+                aria-label="Clear search"
+                className="shrink-0 text-muted transition-colors hover:text-ink"
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                  <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+            )}
+          </span>
           <Link
             href="/admin/stats"
             className="rounded-full border border-ink/15 px-3.5 py-1.5 text-muted transition-colors hover:text-ink"
@@ -587,13 +653,20 @@ function formatRaceDay(iso: string): string {
             Fast tagging
           </Link>
         </span>
-        <button
-          onClick={() => setFolder({ event: null, discipline: null })}
-          className={folder.event === null ? "text-ink" : "text-muted hover:text-ink"}
-        >
-          All events
-        </button>
-        {folder.event !== null && (
+        {searching ? (
+          <span className="text-ink">
+            {inFolder.length} photo{inFolder.length === 1 ? "" : "s"} matching{" "}
+            <span className="font-bold">{query.trim()}</span>
+          </span>
+        ) : (
+          <button
+            onClick={() => setFolder({ event: null, discipline: null })}
+            className={folder.event === null ? "text-ink" : "text-muted hover:text-ink"}
+          >
+            All events
+          </button>
+        )}
+        {!searching && folder.event !== null && (
           <>
             <span className="text-muted">/</span>
             <button
@@ -604,7 +677,7 @@ function formatRaceDay(iso: string): string {
             </button>
           </>
         )}
-        {folder.discipline !== null && folder.event !== EVERY && (
+        {!searching && folder.discipline !== null && folder.event !== EVERY && (
           <>
             <span className="text-muted">/</span>
             <span className="text-ink">

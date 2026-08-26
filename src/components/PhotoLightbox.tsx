@@ -12,11 +12,14 @@ export default function PhotoLightbox({
   onClose,
   onPrev,
   onNext,
+  isAdmin = false,
 }: {
   photo: Photo;
   onClose: () => void;
   onPrev?: () => void;
   onNext?: () => void;
+  /** True only when the person browsing is signed in to /admin in this browser. */
+  isAdmin?: boolean;
 }) {
   const { has, add, remove } = useCart();
   const inCart = has(photo.id);
@@ -105,6 +108,21 @@ export default function PhotoLightbox({
                 <dd className="text-ink">{photo.day}</dd>
               </div>
             </dl>
+            {/* Only ever rendered for a signed-in admin, so buyers never see a
+                filename. Recognising a face on the shop and knowing the number
+                is wrong is useless if you then have to hunt the photo down;
+                this carries its name straight to the search that finds it. */}
+            {isAdmin && (
+              <p className="mt-3 flex items-center justify-between gap-2 font-mono text-[11px]">
+                <span className="text-muted">{photo.title}</span>
+                <a
+                  href={`/admin?find=${encodeURIComponent(photo.id)}`}
+                  className="shrink-0 text-blue hover:underline"
+                >
+                  Fix in admin &rarr;
+                </a>
+              </p>
+            )}
           </div>
 
           <div>
