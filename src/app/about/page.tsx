@@ -1,11 +1,15 @@
 import Image from "next/image";
 import Link from "next/link";
+import { redirect } from "next/navigation";
+import { shopOpen } from "@/lib/shopOpen";
 
 export const metadata = {
   title: "About — h_kivimurd Photography",
 };
 
 export default function AboutPage() {
+  if (!shopOpen()) redirect("/closed");
+
   return (
     <div className="mx-auto max-w-7xl px-5 py-16 sm:px-8 sm:py-24">
       <p className="font-mono text-xs uppercase tracking-[0.25em] text-muted">About</p>
