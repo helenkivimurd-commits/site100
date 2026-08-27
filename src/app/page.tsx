@@ -4,6 +4,8 @@ import BibSearch from "@/components/BibSearch";
 import PhotoGrid from "@/components/PhotoGrid";
 import { getPhotos } from "@/lib/catalog";
 import { formatMoney } from "@/lib/money";
+import { redirect } from "next/navigation";
+import { shopOpen } from "@/lib/shopOpen";
 import {
   SINGLE_PRICE,
   BUNDLE_THRESHOLD,
@@ -60,6 +62,8 @@ const steps = [
 export const dynamic = "force-dynamic";
 
 export default async function Home() {
+  if (!shopOpen()) redirect("/closed");
+
   const photos = await getPhotos();
   const previewPhotos = photos.slice(0, 8);
   return (

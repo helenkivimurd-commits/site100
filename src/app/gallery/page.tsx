@@ -3,6 +3,8 @@ import GalleryClient from "./GalleryClient";
 import { getPhotos } from "@/lib/catalog";
 import { browse } from "@/lib/browse";
 import { record, referrerName, visitorHash } from "@/lib/analytics";
+import { redirect } from "next/navigation";
+import { shopOpen } from "@/lib/shopOpen";
 
 // The catalogue is read per request, so a photo uploaded through /admin is
 // in the gallery immediately instead of waiting for the next build.
@@ -23,6 +25,8 @@ export default async function GalleryPage({
     photo?: string;
   }>;
 }) {
+  if (!shopOpen()) redirect("/closed");
+
   const { bib, event, discipline, nobib, photo } = await searchParams;
   const photos = await getPhotos();
 

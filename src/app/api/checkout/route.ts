@@ -5,6 +5,7 @@ import type { Photo } from "@/lib/types";
 import { pricePerPhotoAt } from "@/lib/pricing";
 import { createPendingOrder } from "@/lib/orders";
 import { clientKey, rateLimit } from "@/lib/rateLimit";
+import { shopOpen } from "@/lib/shopOpen";
 
 // Stripe caps a Checkout Session at 100 line items.
 const MAX_PHOTOS = 100;
@@ -16,6 +17,12 @@ const MAX_CHECKOUTS = 15;
 const CHECKOUT_WINDOW_MS = 5 * 60 * 1000;
 
 export async function POST(request: Request) {
+  // Closed means closed: a basket kept open in a tab must not be able to buy
+  // after the shop has shut.
+  if (!shopOpen()) {
+    return NextResponse.json({ error: "The shop is closed." }, { status: 403 });
+  }
+
   const limit = rateLimit(clientKey(request, "checkout"), MAX_CHECKOUTS, CHECKOUT_WINDOW_MS);
   if (!limit.ok) {
     return NextResponse.json(
